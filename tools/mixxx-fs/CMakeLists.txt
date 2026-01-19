@@ -14,6 +14,7 @@ set(MIXXX_FS_SOURCES
     ${CMAKE_SOURCE_DIR}/src/streaming/bridge/sparsecache.cpp
     ${CMAKE_SOURCE_DIR}/src/streaming/bridge/bridgeserver.cpp
     ${CMAKE_SOURCE_DIR}/src/streaming/bridge/bridgeserver.h
+    rangefetcher.cpp
 )
 
 add_executable(mixxx-fs ${MIXXX_FS_SOURCES})

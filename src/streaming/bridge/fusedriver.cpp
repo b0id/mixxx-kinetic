@@ -9,11 +9,15 @@
 
 FuseDriver* FuseDriver::s_instance = nullptr;
 
-FuseDriver::FuseDriver() {
+FuseDriver::FuseDriver()
+        : m_fetcher(new mixxx::kinetic::RangeFetcher(nullptr)) {
     s_instance = this;
 }
 
 FuseDriver::~FuseDriver() {
+    // Delete fetcher first
+    delete m_fetcher;
+
     for (auto const& [ino, cache] : m_caches) {
         delete cache;
     }
@@ -47,8 +51,14 @@ fuse_ino_t FuseDriver::registerFile(const std::string& backingPath, int64_t size
 
     // Store filename mapping
     std::string filename = std::filesystem::path(backingPath).filename().string();
-    m_nameToInode[filename] = ino;
-    std::cout << "FuseDriver: Registered " << filename << " -> " << ino << std::endl;
+
+    // Check if backingPath is a URL (hacky check for now)
+    if (backingPath.find("http") == 0) {
+        // It's a URL!
+        m_inodeToUrl[ino] = backingPath;
+        // filename might be slashes or ugly, let's just use inode ID for now if it looks like a URL
+        filename = std::to_string(ino) + ".mp3";
+    }
 
     m_nameToInode[filename] = ino;
     std::cout << "FuseDriver: Registered " << filename << " -> " << ino << std::endl;
@@ -63,6 +73,7 @@ void FuseDriver::unregisterFile(fuse_ino_t ino) {
     if (it != m_caches.end()) {
         delete it->second;
         m_caches.erase(it);
+        m_inodeToUrl.erase(ino);
 
         // Remove from name map (slow linear scan, but acceptable for now)
         for (auto nit = m_nameToInode.begin(); nit != m_nameToInode.end();) {
@@ -185,13 +196,29 @@ void FuseDriver::read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, st
     }
 
     // Check if range is cached
-    // For now, since we implemented file backing read only if cached,
-    // we should be careful.
-    // But SparseCache::read reads from the backing file.
-    // If the backing file doesn't have data, it will read zeroes or garbage unless we ensure it's written.
+    // In real implementation, we would query cache->isRangeCached().
+    // If not cached, we blocking fetch.
 
-    // For testing, let's assume we want to read whatever is in the backing file.
-    // But real implementation needs to check isRangeCached and block/download.
+    // Naive fetch-on-read for now:
+    // If we have a URL for this inode, and we blindly assume we need to fetch if the backing file
+    // doesn't have data.
+
+    std::string urlStr;
+    {
+        std::lock_guard<std::mutex> lock(instance()->m_mutex);
+        auto it = instance()->m_inodeToUrl.find(ino);
+        if (it != instance()->m_inodeToUrl.end()) {
+            urlStr = it->second;
+        }
+    }
+
+    if (!urlStr.empty()) {
+        // Fetcher is synchronous for now
+        QByteArray data = instance()->m_fetcher->fetch(QUrl(QString::fromStdString(urlStr)), off, size);
+        if (!data.isEmpty()) {
+            cache->write(data.constData(), data.size(), off);
+        }
+    }
 
     char* buf = new char[size];
     ssize_t res = cache->read(buf, size, off);

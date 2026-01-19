@@ -7,6 +7,7 @@
 #include <string>
 
 #include "streaming/bridge/sparsecache.h"
+#include "tools/mixxx-fs/rangefetcher.h"
 
 class FuseDriver {
   public:
@@ -38,5 +39,8 @@ class FuseDriver {
     // In real implementatoin, these would be managed by a more complex lifecycle
     std::map<fuse_ino_t, SparseCache*> m_caches;
     std::map<std::string, fuse_ino_t> m_nameToInode; // Filename in root -> Inode
+    std::map<fuse_ino_t, std::string> m_inodeToUrl;  // Map inode to URL for fetching
+
     std::mutex m_mutex;
+    mixxx::kinetic::RangeFetcher* m_fetcher;
 };
