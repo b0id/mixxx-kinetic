@@ -1,0 +1,38 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Remote Build",
+            "type": "shell",
+            "command": "~/bin/remote-build.sh",
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Remote Test",
+            "type": "shell",
+            "command": "~/bin/remote-test.sh",
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Remote Build + Test",
+            "type": "shell",
+            "command": "~/bin/remote-build.sh && ~/bin/remote-test.sh",
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        }
+    ]
+}
