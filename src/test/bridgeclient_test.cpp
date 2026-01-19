@@ -58,7 +58,6 @@ TEST_F(BridgeClientTest, RegisterTrackSendReceive) {
     });
 
     // Server logic: synchronous wait
-    // Server logic: synchronous wait
     if (!server.waitForNewConnection(5000)) {
         // Check result to see if client failed
         if (result.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
@@ -69,41 +68,35 @@ TEST_F(BridgeClientTest, RegisterTrackSendReceive) {
 
     QLocalSocket* socket = server.nextPendingConnection();
     ASSERT_TRUE(socket != nullptr);
-    QLocalSocket* socket = server.nextPendingConnection();
-    ASSERT_TRUE(socket != nullptr);
 
     if (!socket->waitForReadyRead(5000)) {
-        if (!socket->waitForReadyRead(5000)) {
-            FAIL() << "Server read timeout";
+        FAIL() << "Server read timeout";
+    }
+
+    // Read loop
+    while (socket->bytesAvailable()) {
+        if (!socket->canReadLine()) {
+            // Wait more if line not complete?
+            socket->waitForReadyRead(1000);
         }
+        QByteArray data = socket->readLine();
+        // std::cerr << "TestServer: Received: " << data.toStdString() << std::endl;
 
-        // Read loop
-        while (socket->bytesAvailable()) {
-            if (!socket->canReadLine()) {
-                // Wait more if line not complete?
-                socket->waitForReadyRead(1000);
-            }
-            QByteArray data = socket->readLine();
-            QByteArray data = socket->readLine();
-            // std::cerr << "TestServer: Received: " << data.toStdString() << std::endl;
+        QJsonDocument doc = QJsonDocument::fromJson(data);
+        QJsonObject req = doc.object();
 
-            QJsonDocument doc = QJsonDocument::fromJson(data);
-            QJsonObject req = doc.object();
+        // Reply
+        QJsonObject res;
+        res[json::STATUS] = "ok";
+        res[field::INODE] = 42.0;
 
-            // Reply
-            QJsonObject res;
-            res[json::STATUS] = "ok";
-            res[field::INODE] = 42.0;
-
-            QJsonDocument resDoc(res);
-            QByteArray respData = resDoc.toJson(QJsonDocument::Compact);
-            respData.append('\n');
-            socket->write(respData);
-            socket->flush();
-            socket->waitForBytesWritten(1000);
-            socket->waitForBytesWritten(1000);
-            // std::cerr << "TestServer: Sent response: " << respData.toStdString() << std::endl;
-        }
+        QJsonDocument resDoc(res);
+        QByteArray respData = resDoc.toJson(QJsonDocument::Compact);
+        respData.append('\n');
+        socket->write(respData);
+        socket->flush();
+        socket->waitForBytesWritten(1000);
+        // std::cerr << "TestServer: Sent response: " << respData.toStdString() << std::endl;
     }
 
     uint64_t inode = result.get();
