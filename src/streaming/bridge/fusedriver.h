@@ -6,8 +6,8 @@
 #include <mutex>
 #include <string>
 
+#include "streaming/bridge/rangefetcher.h"
 #include "streaming/bridge/sparsecache.h"
-#include "tools/mixxx-fs/rangefetcher.h"
 
 class FuseDriver {
   public:

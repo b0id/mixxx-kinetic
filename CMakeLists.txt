@@ -2879,6 +2879,9 @@ if(BUILD_TESTING)
     #src/test/effectchainslottest.cpp
     src/test/enginebufferscalelineartest.cpp
     src/test/bridge/fusedriver_fetch_test.cpp
+    src/streaming/bridge/fusedriver.cpp
+    src/streaming/bridge/sparsecache.cpp
+    src/streaming/bridge/rangefetcher.cpp
     src/test/enginebuffertest.cpp
     src/test/enginefilterbiquadtest.cpp
     src/test/enginemixertest.cpp
