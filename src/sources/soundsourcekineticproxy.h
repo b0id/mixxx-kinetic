@@ -13,14 +13,7 @@
 template<typename T, size_t Capacity>
 class StreamRingBuffer;
 
-class SoundSourceKineticProxy : public SoundSource {
-    // Q_OBJECT // SoundSource might not be a QObject in mixxx?
-    // Spec showed QObject macros in StreamingService but not explicit in SoundSourceProxy snippet
-    // except for signals. SoundSource usually isn't a QObject.
-    // If signals are required, we might need to inherit QObject too or use a helper.
-    // Spec says: "signals: signal void bufferUnderrun();" - pseudosyntax.
-    // We will assume it needs QObject or similar mechanism.
-    // For now, adhering to C++ structure.
+class SoundSourceKineticProxy : public mixxx::SoundSource {
   public:
     explicit SoundSourceKineticProxy(const QString& virtualPath);
     ~SoundSourceKineticProxy() override;

@@ -8,7 +8,7 @@ mixxx::Logger kLogger("SoundSourceKineticProxy");
 }
 
 SoundSourceKineticProxy::SoundSourceKineticProxy(const QString& virtualPath)
-        : SoundSource(QUrl::fromLocalFile(virtualPath)),
+        : mixxx::SoundSource(QUrl::fromLocalFile(virtualPath)),
           m_virtualPath(virtualPath) {
 }
 
@@ -17,47 +17,43 @@ SoundSourceKineticProxy::~SoundSourceKineticProxy() {
 }
 
 mixxx::AudioSource::OpenResult SoundSourceKineticProxy::tryOpen(
-        OpenMode mode, const OpenParams& params) {
+        mixxx::AudioSource::OpenMode mode, const mixxx::AudioSource::OpenParams& params) {
     if (m_pDelegate) {
-        return OpenResult::Succeeded;
+        return mixxx::AudioSource::OpenResult::Succeeded;
     }
 
-    // TODO(kinetic): Extract real path and size from metadata or params?
-    // For now, we assume the VirtualPath *IS* the backing path or we have a way to look it up.
-    // In reality, the Proxy is created with knowledge of the Track info.
-    // For this stub repair, we'll assume m_virtualPath acts as the backing file for registration test.
-
     // Register with Bridge
-    mixxx::kinetic::bridge::BridgeClient client;
+    BridgeClient client;
     if (!client.connectToServer()) {
         kLogger.warning() << "Failed to connect to Bridge Server";
-        return OpenResult::Failed;
+        return mixxx::AudioSource::OpenResult::Failed;
     }
 
     // REGISTER_TRACK
     // We need the ACTUAL backing file path (the cache path).
     // This Proxy class needs to be instantiated with it.
     // Assuming m_virtualPath is the backing path for now.
-    fuse_ino_t inode = client.registerTrack(m_virtualPath, 1024 * 1024 * 10); // Dummy size
+    // Note: registerTrack returns uint64_t (abstracted inode)
+    uint64_t inode = client.registerTrack(m_virtualPath, 1024 * 1024 * 10); // Dummy size
     if (inode == 0) {
         kLogger.warning() << "Failed to register track with Bridge";
-        return OpenResult::Failed;
+        return mixxx::AudioSource::OpenResult::Failed;
     }
 
     // Construct FUSE path
     QString fusePath = QString("/tmp/mountpoint/%1").arg(inode);
 
     // Create delegate
-    m_pDelegate = newSoundSourceFromUrl<SoundSource>(QUrl::fromLocalFile(fusePath));
+    m_pDelegate = mixxx::newSoundSourceFromUrl<mixxx::SoundSource>(QUrl::fromLocalFile(fusePath));
     if (!m_pDelegate) {
-        return OpenResult::Failed;
+        return mixxx::AudioSource::OpenResult::Failed;
     }
 
     return tryOpenOn(*m_pDelegate, mode, params);
 }
 
 mixxx::ReadableSampleFrames SoundSourceKineticProxy::readSampleFramesClamped(
-        const WritableSampleFrames& sampleFrames) {
+        const mixxx::WritableSampleFrames& sampleFrames) {
     if (!m_pDelegate) {
         return mixxx::ReadableSampleFrames(sampleFrames.frameIndexRange());
     }
@@ -71,7 +67,7 @@ void SoundSourceKineticProxy::close() {
     }
     // Unregister? We typically unregister when the track is unloaded.
     // For now, simple client.
-    mixxx::kinetic::bridge::BridgeClient client;
+    BridgeClient client;
     if (client.connectToServer()) {
         // We'd need the inode again.
     }
