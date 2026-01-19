@@ -26,14 +26,14 @@ class SoundSourceKineticProxy : public SoundSource {
     ~SoundSourceKineticProxy() override;
 
     // AudioSource interface
-    OpenResult tryOpen(OpenMode mode, const OpenParams& params) override;
+    mixxx::AudioSource::OpenResult tryOpen(mixxx::AudioSource::OpenMode mode, const mixxx::AudioSource::OpenParams& params) override;
 
     // IAudioSourceReader interface
-    ReadableSampleFrames readSampleFramesClamped(const WritableSampleFrames& sampleFrames) override;
+    mixxx::ReadableSampleFrames readSampleFramesClamped(const mixxx::WritableSampleFrames& sampleFrames) override;
 
     void close() override;
 
-    // SoundSource overrides (if any, typically just constructor helper stuff)
+    // SoundSource overrides
     // SoundSource::getType() is non-virtual.
 
     // Streaming extensions
@@ -43,5 +43,5 @@ class SoundSourceKineticProxy : public SoundSource {
 
   private:
     QString m_virtualPath;
-    AudioSourcePointer m_pDelegate;
+    mixxx::AudioSourcePointer m_pDelegate;
 };
