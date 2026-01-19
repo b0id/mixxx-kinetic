@@ -570,5 +570,43 @@ Implemented the data fetching capability for the MixxxFS FUSE daemon, allowing i
 - **A-SOURCE**: Ready for integration.
 
 ### Next Steps
-- Perform full end-to-end playback test with `BeatportService` driving the `BridgeClient`.
-- Optimize fetching strategy (prefetching/read-ahead) to avoid blocking FUSE reads on network latency.
+
+## [2026-01-19] Source Layer Hardening (Phase 3)
+
+### Summary
+Implemented the "Zero-Trust Stream Principle" by decoupling the Mixxx audio engine from FUSE I/O. This ensures that audio playback never stalls due to network latency in the FUSE layer.
+
+### Actions Taken
+
+#### 1. StreamRingBuffer Implementation
+- **Component**: `mixxx::StreamRingBuffer` (Template Class)
+- **Mechanism**: Lock-free Single-Producer/Single-Consumer (SPSC) queue wrapping `rigtorp::SPSCQueue`.
+- **Features**:
+    - `reset()` method added to support instant seeking (flushing old buffer data).
+    - `write`/`read` methods adapted for chunked transfers.
+
+#### 2. SoundSourceKineticProxy Hardening
+- **Threading**: Introduced a dedicated `readWorker` thread initialized in `tryOpen`.
+- **Decoupling**:
+    - **Worker Thread**: Continuously reads from the FUSE delegate (blocking) and writes to the RingBuffer.
+    - **Audio Thread**: Reads from the RingBuffer (non-blocking).
+- **Silence Injection**: `readSampleFramesClamped` now returns silence (zeros) immediately if the RingBuffer is empty (underrun), rather than blocking.
+- **Seek Handling**:
+    - Implemented with atomic flags (`m_seekPos`).
+    - Audio thread detects seek -> sets flag -> returns silence.
+    - Worker thread detects flag -> seeks delegate -> flushes RingBuffer -> resumes reading.
+
+#### 3. Verification
+- **Unit Tests**:
+    - `src/test/sources/streamringbuffer_test.cpp`: Verified FIFO behavior and concurrent access concepts.
+    - Verified build on `chi-big`.
+
+### Current State
+- **A-HOOK**: Complete.
+- **A-BRIDGE**: Complete (Basic Fetching).
+- **A-SOURCE**: **Hardened**. Proxies now robust against slow FUSE reads.
+
+### Next Steps
+1.  **End-to-End Integration (Phase 4)**: Run a full playback test with `BeatportService` -> `SoundSourceKineticProxy` -> `BridgeClient` -> `FuseDriver` -> `RangeFetcher`.
+2.  **Prefetching**: Optimize `RangeFetcher` to pre-buffer data intelligently.
+3.  **XDG Compliance**: Move sockets/mounts from `/tmp` to `/run/user/$UID`.
