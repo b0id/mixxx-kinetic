@@ -74,6 +74,15 @@ class StreamRingBuffer {
         return m_queue.capacity();
     }
 
+    /**
+     * @brief clear the buffer (consumer only).
+     */
+    void reset() {
+        while (m_queue.front()) {
+            m_queue.pop();
+        }
+    }
+
   private:
     rigtorp::SPSCQueue<T> m_queue;
 };

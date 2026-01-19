@@ -7,9 +7,9 @@
 #include <memory>
 #include <thread>
 
-#include "sources/soundsource.h" // existing mixxx base
-#include "sources/streamringbuffer.h"
-#include "util/defs.h" // For SINT, etc.
+#include "sources/soundsource.h"      // existing mixxx base
+#include "sources/streamringbuffer.h" // Ensure it's included
+#include "util/defs.h"                // For SINT, etc.
 
 // Forward declaration
 // Forward declaration
@@ -44,6 +44,10 @@ class SoundSourceKineticProxy : public mixxx::SoundSource {
 
     // RingBuffer for lock-free audio transfer
     std::unique_ptr<mixxx::StreamRingBuffer<CSAMPLE>> m_pRingBuffer;
+
+    // Playback State
+    std::atomic<int64_t> m_seekPos{-1}; // -1 means no seek pending
+    SINT m_nextFrameIndex{0};
 
     // Worker thread for reading from FUSE
     std::thread m_readThread;
