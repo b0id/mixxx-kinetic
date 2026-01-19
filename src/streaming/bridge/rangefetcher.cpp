@@ -61,4 +61,7 @@ qint64 RangeFetcher::fetchSize(const QUrl& url) {
 }
 
 } // namespace kinetic
+
 } // namespace mixxx
+
+#include "moc_rangefetcher.cpp"
