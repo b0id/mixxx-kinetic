@@ -3626,6 +3626,7 @@ else()
 endif()
 
 # Ogg
+find_package(Ogg REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(FUSE3 fuse3) # Optional generally, but needed for tests if enabled
 target_link_libraries(mixxx-lib PRIVATE Ogg::ogg)
