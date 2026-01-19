@@ -33,7 +33,6 @@ mixxx::AudioSource::OpenResult SoundSourceKineticProxy::tryOpen(
     }
 
     // REGISTER_TRACK
-    // We append the extension from the virtual path so the provider can be identified.
     uint64_t inode = client.registerTrack(m_virtualPath, 1024 * 1024 * 10); // Dummy size
     if (inode == 0) {
         kLogger.warning() << "Failed to register track with Bridge";
@@ -45,11 +44,11 @@ mixxx::AudioSource::OpenResult SoundSourceKineticProxy::tryOpen(
     QString extension = fileInfo.suffix();
 
     // Append extension to FUSE path so the SoundSourceProvider can recognize it.
-    // The FUSE driver must handle this lookup (or we rely on the inode in the path).
     QString fusePath = QString("/tmp/mountpoint/%1.%2").arg(inode).arg(extension);
 
     // Find Provider
-    auto pProvider = mixxx::SoundSourceProxy::getPrimaryProviderForFileType(extension);
+    // SoundSourceProxy is in Global namespace
+    auto pProvider = SoundSourceProxy::getPrimaryProviderForFileType(extension);
     if (!pProvider) {
         kLogger.warning() << "No provider found for extension" << extension;
         return mixxx::AudioSource::OpenResult::Failed;
@@ -69,7 +68,8 @@ mixxx::ReadableSampleFrames SoundSourceKineticProxy::readSampleFramesClamped(
     if (!m_pDelegate) {
         return mixxx::ReadableSampleFrames(sampleFrames.frameIndexRange());
     }
-    return m_pDelegate->readSampleFramesClamped(sampleFrames);
+    // Use helper to access protected member on delegate
+    return mixxx::AudioSource::readSampleFramesClampedOn(*m_pDelegate, sampleFrames);
 }
 
 void SoundSourceKineticProxy::close() {
