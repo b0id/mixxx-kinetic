@@ -1,5 +1,6 @@
 #include "beatportservice.h"
 
+#include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -246,7 +247,30 @@ QFuture<StreamInfo> BeatportService::getStreamInfo(const QString& trackId) {
 
         StreamInfo info;
         info.trackId = trackId;
-        info.streamUrl = QUrl(obj["stream_url"].toString());
+
+        // KINETIC: Write Manifest File (.knt)
+        // Instead of returning the raw HLS URL, we write a manifest file that the
+        // SoundSourceKineticProvider will recognize.
+
+        QJsonObject manifest;
+        manifest["url"] = obj["stream_url"].toString();
+        manifest["id"] = trackId;
+        manifest["extension"] = "mp3"; // Beatport stream is usually aac/mp3, but let's say mp3 for broad compat
+        // Note: Real mp4/aac support in FUSE requires appropriate Provider matching.
+
+        QJsonDocument manifestDoc(manifest);
+        QString tempPath = QString("/tmp/beatport_%1.knt").arg(trackId);
+        QFile tempFile(tempPath);
+        if (tempFile.open(QIODevice::WriteOnly)) {
+            tempFile.write(manifestDoc.toJson());
+            tempFile.close();
+            // Return the local manifest path as the "stream URL" to be loaded by Engine
+            info.streamUrl = QUrl::fromLocalFile(tempPath);
+        } else {
+            qWarning() << "BeatportService: Failed to write manifest to" << tempPath;
+            info.streamUrl = QUrl(); // Fail
+        }
+
         info.mimeType = "application/vnd.apple.mpegurl"; // HLS
         info.codec = "aac";
         info.encrypted = false; // Beatport typically unencrypted

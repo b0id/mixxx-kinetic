@@ -1,6 +1,9 @@
 #include "soundsourcekineticproxy.h"
 
+#include <QFile>
 #include <QFileInfo>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 #include "sources/soundsourceproxy.h"
 #include "streaming/bridge/bridgeclient.h"

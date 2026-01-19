@@ -496,3 +496,35 @@ Implemented the `BridgeClient` class for communicating with the `mixxx-fs` daemo
 ### Next Steps
 1.  **Integrate BridgeClient**: Connect `BeatportService` (or `SoundSourceKineticProxy` stub) to `BridgeClient` to actually register streamed tracks.
 2.  **Verify End-to-End**: Test registering a real file via `BridgeClient` and reading it through the FUSE mount.
+
+## [2026-01-19] Source Layer Integration (Repair)
+
+### Summary
+Repaired the `SoundSourceKineticProxy` stub to implement the correct `mixxx::SoundSource` interface and successfully integrated it with `BridgeClient` and `SoundSourceProxy` factory.
+
+### Actions Taken
+
+#### 1. SoundSourceKineticProxy Repair
+- **Inheritance**: Correctly inherited from `mixxx::SoundSource` (replacing direct `AudioSource` mix-up).
+- **Factory Pattern**:
+    - Replaced generic `newSoundSourceFromUrl<SoundSource>` (which failed due to abstract base class) with `mixxx::SoundSourceProxy::getPrimaryProviderForFileType()`.
+    - Implemented logic to resolve the provider based on the virtual file's extension.
+- **Delegation**:
+    - Implemented `tryOpen` to register the track with `BridgeClient`, map the inode, and open a delegate `SoundSource` pointed at the FUSE path (`/tmp/mountpoint/<inode>.<ext>`).
+    - Implemented `readSampleFramesClamped` to delegate to the underlying source using `readSampleFramesClampedOn` (accessing protected members).
+- **Namespaces**: Fixed `mixxx::` vs global namespace issues for `BridgeClient` and `SoundSourceProxy`.
+
+#### 2. Build System
+- **Re-enabled**: Uncommented `src/sources/soundsourcekineticproxy.cpp` and `soundsourcestream.cpp` in `src/streaming/CMakeLists.txt`.
+- **Verification**: `remote-build.sh` passed successfully on `chi-big`. `mixxx-lib` and `mixxx-test` compile with the new Source Layer.
+
+### Current State
+- **A-HOOK**: Complete.
+- **A-BRIDGE**: Complete (Client & Server).
+- **A-SOURCE**:
+    - `SoundSourceKineticProxy`: Compiles and Logic Implemented (Delegation + IPC).
+    - `SoundSourceStream`: Compiles (Stub).
+
+### Next Steps
+1.  **Connect BeatportService**: Instantiate `SoundSourceKineticProxy` (via `SoundSourceStream`) when loading a Beatport track.
+2.  **End-to-End Test**: Verify playback of a "fake" registered track via the full chain.

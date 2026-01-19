@@ -1585,6 +1585,7 @@ add_library(
   src/sources/soundsourceprovider.cpp
   src/sources/soundsourceproviderregistry.cpp
   src/sources/soundsourceproxy.cpp
+  src/sources/soundsourcekineticprovider.cpp
   src/sources/soundsourcesndfile.cpp
   src/track/albuminfo.cpp
   src/track/beatfactory.cpp
