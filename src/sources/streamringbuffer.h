@@ -64,7 +64,7 @@ class StreamRingBuffer {
      * @brief Checks if the buffer is empty.
      */
     bool empty() const {
-        return m_queue.front() == nullptr;
+        return m_queue.empty();
     }
 
     /**
