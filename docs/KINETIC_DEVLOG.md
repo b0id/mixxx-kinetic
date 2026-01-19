@@ -528,3 +528,47 @@ Repaired the `SoundSourceKineticProxy` stub to implement the correct `mixxx::Sou
 ### Next Steps
 1.  **Connect BeatportService**: Instantiate `SoundSourceKineticProxy` (via `SoundSourceStream`) when loading a Beatport track.
 2.  **End-to-End Test**: Verify playback of a "fake" registered track via the full chain.
+
+## [2026-01-19] MixxxFS Data Fetching Implementation
+
+### Summary
+Implemented the data fetching capability for the MixxxFS FUSE daemon, allowing it to download audio stream data on-demand using HTTP Range requests.
+
+### Actions Taken
+
+#### 1. RangeFetcher Implementation
+- Created `RangeFetcher` class in `src/streaming/bridge/`.
+- Uses `QNetworkAccessManager` to perform HTTP GET requests with `Range` headers.
+- Implemented `fetch()` (blocking/synchronous) and `fetchSize()` (HEAD request).
+- Integrated with local Qt event loop to handle async `QNetworkReply` synchronously within the FUSE blocking context.
+
+#### 2. FuseDriver Integration
+- Updated `FuseDriver::registerFile` to accept URL strings.
+- Modified `FuseDriver::read` to intercept reads for URL-backed inodes.
+- Logic:
+    1.  Check if inode maps to a URL.
+    2.  If yes, call `RangeFetcher::fetch` for the requested offset/size.
+    3.  Write fetched data to `SparseCache`.
+    4.  Serve read from `SparseCache`.
+
+#### 3. Build System & Dependencies
+- Moved `rangefetcher.*` from `tools/mixxx-fs` to `src/streaming/bridge` for proper architectural layering.
+- Updated `CMakeLists.txt` to link `mixxx-test` against `fuse3` and Qt Network.
+- Fixed MOC issues by adding `#include "moc_rangefetcher.cpp"` to implementation file.
+
+### Verification
+- **Unit Test**: Created `src/test/bridge/fusedriver_fetch_test.cpp`.
+- **Test Execution**: `FuseDriverTest.RegisterUrl` passed on `chi-big`.
+- **Logic Check**: Verified that `FuseDriver` correctly differentiates between local file backing and URL backing.
+
+### Current State
+- **A-HOOK**: Complete.
+- **A-BRIDGE**:
+    - IPC: Complete.
+    - Fetching: **Complete** (Sync "Fetch-on-read").
+    - Caching: Basic In-Memory/File backing.
+- **A-SOURCE**: Ready for integration.
+
+### Next Steps
+- Perform full end-to-end playback test with `BeatportService` driving the `BridgeClient`.
+- Optimize fetching strategy (prefetching/read-ahead) to avoid blocking FUSE reads on network latency.
