@@ -6,19 +6,25 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(FUSE3 REQUIRED fuse3)
 
 find_package(CURL REQUIRED)
+find_package(Qt6 COMPONENTS Core Network REQUIRED)
 
 set(MIXXX_FS_SOURCES
     main.cpp
     ${CMAKE_SOURCE_DIR}/src/streaming/bridge/fusedriver.cpp
     ${CMAKE_SOURCE_DIR}/src/streaming/bridge/sparsecache.cpp
+    ${CMAKE_SOURCE_DIR}/src/streaming/bridge/bridgeserver.cpp
+    ${CMAKE_SOURCE_DIR}/src/streaming/bridge/bridgeserver.h
 )
 
 add_executable(mixxx-fs ${MIXXX_FS_SOURCES})
+set_target_properties(mixxx-fs PROPERTIES AUTOMOC ON)
 
 target_link_libraries(mixxx-fs
     PRIVATE
     ${FUSE3_LIBRARIES}
     CURL::libcurl
+    Qt6::Core
+    Qt6::Network
 )
 
 target_include_directories(mixxx-fs

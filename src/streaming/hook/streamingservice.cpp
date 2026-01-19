@@ -3,4 +3,4 @@
 // StreamingService is a pure abstract interface
 // This file exists only to satisfy Qt's MOC system
 
-#include "streamingservice.moc"
+#include "moc_streamingservice.cpp"

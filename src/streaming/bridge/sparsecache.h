@@ -12,7 +12,7 @@ class SparseCache {
         int64_t end; // exclusive
     };
 
-    SparseCache();
+    SparseCache(const std::string& backingFilePath, int64_t totalSize);
 
     // Check if byte range is fully cached
     bool isRangeCached(int64_t start, int64_t length) const;
@@ -23,6 +23,10 @@ class SparseCache {
     // Mark range as cached after download
     void markCached(int64_t start, int64_t length);
 
+    // File I/O
+    ssize_t read(char* buffer, size_t size, off_t offset);
+    ssize_t write(const char* buffer, size_t size, off_t offset);
+
     // Get total cached percentage
     double getCachedPercentage() const;
 
@@ -30,9 +34,9 @@ class SparseCache {
     std::vector<CachedRange> getAllCachedRanges() const;
 
   private:
-    std::map<int64_t, int64_t> m_intervals; // start -> end
-    int64_t m_totalSize;
     std::string m_backingFilePath;
+    int64_t m_totalSize;
+    std::map<int64_t, int64_t> m_intervals; // start -> end
 
     void mergeOverlappingIntervals();
 };

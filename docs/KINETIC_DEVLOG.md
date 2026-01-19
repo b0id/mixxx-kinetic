@@ -337,4 +337,117 @@ class SoundSourceKineticProxy : public SoundSource {
 **Documentation**:
 - `docs/KINETIC_DEVLOG.md` (this file)
 
+## [2026-01-18] Agent A-BRIDGE Initiation & Build Verification
+
+### Summary
+Initiated development of the Bridge layer (Agent A-BRIDGE) and achieved a stable build by resolving dependency issues and fixing MOC integration.
+
+### Actions Taken
+
+#### 1. Bridge Layer Implementation
+- **FuseDriver**: Implemented minimal FUSE operations (`init`, `getattr` for root) and daemon entry point in `tools/mixxx-fs/main.cpp`.
+- **SparseCache**: Implemented core logic for tracking cached byte intervals using `std::map`.
+
+#### 2. Build Repairs & Dependency Resolution
+- **Microsoft.GSL**: Identified missing dependency. Installed `microsoft-gsl` from AUR (package version 4.2.1-1).
+- **Source Layer Deferral**: Temporarily removed `src/sources/soundsourcekineticproxy.*` and `src/sources/soundsourcestream.*` from `src/streaming/CMakeLists.txt` to bypass interface mismatch errors (following Option 2 from previous session).
+- **MOC Integration Fixes**:
+    - Removed `SKIP_AUTOMOC ON` property from streaming headers in `src/streaming/CMakeLists.txt`.
+    - Corrected include directive in `.cpp` files to use the automoc-generated filename format:
+        - `#include "beatportservice.moc"` -> `#include "moc_beatportservice.cpp"`
+        - `#include "oauthmanager.moc"` -> `#include "moc_oauthmanager.cpp"`
+        - `#include "streamingservice.moc"` -> `#include "moc_streamingservice.cpp"`
+    - This aligns with Mixxx's coding standard for incremental build optimization.
+
+#### 3. Verification
+- **Compilation**: Successfully compiled `mixxx-lib`, `mixxx-fs`, and `mixxx-test`.
+- **Build Status**: ✅ Clean build on current `main` branch with new Bridge components.
+
+### Current State
+- **Agent A-HOOK**: Complete and compiling.
+- **Agent A-BRIDGE**:
+    - `FuseDriver`: Minimal stub compiled and linked.
+    - `SparseCache`: Logic implemented and compiled.
+    - `Mixxx-FS`: Daemon executable builds and runs (mounts FUSE fs).
+- **Agent A-SOURCE**: Temporarily disabled in build system.
+
+### Next Steps
+1.  **Expand Bridge Layer**:
+    - Implement `FuseDriver::read()` connecting to `SparseCache`.
+    - Implement `SparseCache` file backing store logic.
+2.  **Define IPC**:
+    - Design mechanism for Mixxx main process to communicate track metadata/stream info to `mixxx-fs` daemon (e.g., shared memory, socket, or DBus).
+3.  **Source Layer Integration**:
+    - Re-enable and fix `SoundSourceKineticProxy` once Bridge structure is mature.
+
+## [2026-01-18] Agent A-BRIDGE: Read Logic & Build Refactor
+
+### Summary
+Implemented file backing and read operations for the Bridge layer. Refactored the build system to correctly isolate FUSE dependencies.
+
+### Actions Taken
+
+#### 1. SparseCache Implementation
+- **File Backing**: `SparseCache` can now read/write from a physical disk file (`pread`/`pwrite`).
+- **Read Logic**: `read()` method checks memory methods (stubbed for now to read from backing file if available).
+- **Persistence**: Constructor now accepts a backing file path.
+
+#### 2. FuseDriver Implementation
+- **Singleton Pattern**: Implemented `FuseDriver::instance()` to access the driver context from static FUSE callbacks.
+- **Read Operation**: `FuseDriver::read` delegates to `SparseCache::read`.
+- **Test File**: Auto-creates a virtual `test.mp3` (inode 2) backed by `/tmp/mixxx-cache-test.mp3`.
+
+#### 3. Build System Refactor
+- **Architecture Fix**: `FuseDriver` depends on `libfuse3`, which `mixxx-lib` does not link.
+- **Separation**:
+    - Removed `src/streaming/bridge/fusedriver.cpp` from `mixxx-lib` target (in `src/streaming/CMakeLists.txt`).
+    - `FuseDriver` is now exclusively compiled into the `mixxx-fs` daemon (which links `fuse3`).
+    - `SparseCache` remains in both (shared logic, standard C++ only).
+- **Result**: `mixxx-fs` compiles with FUSE support, `mixxx-lib` compiles without FUSE dependency issues.
+
+### Verification
+- **Compilation**: ✅ Clean build of `mixxx`, `mixxx-fs`, and `mixxx-test`.
+- **Logic**: `mixxx-fs` binary verified to link correctly.
+
+### Next Steps
+- **IPC Implementation**: Design mechanism for Mixxx main process to tell `mixxx-fs` "File X is mapped to Inode Y".
+
+## [2026-01-18] Agent A-BRIDGE: IPC Implementation
+
+### Summary
+Established Inter-Process Communication (IPC) between Mixxx and `mixxx-fs` using Unix Domain Sockets and JSON.
+
+### Actions Taken
+1.  **Dependencies**: Added `Qt6::Network` and `Qt6::Core` to `mixxx-fs` for socket and event loop support.
+2.  **BridgeServer**: Implemented a `QLocalServer` listening on `/tmp/mixxx-kinetic-bridge.sock`.
+    - Handles `register` command to map a backing file + size to a new virtual inode.
+3.  **FuseDriver Updates**:
+    - Made `FuseDriver` thread-safe with `std::mutex`.
+    - Added `registerFile()` method to dynamically add files to the virtual filesystem.
+4.  **Main Loop Refactor**:
+    - Updated `tools/mixxx-fs/main.cpp` to instantiate `QCoreApplication`.
+    - Runs the blocking FUSE loop in a separate `std::thread`.
+    - Runs the Qt Event Loop (`app.exec()`) in the main thread to handle IPC.
+
+### Verification
+- **Build**: ✅ Clean build of `mixxx-fs` with Qt support.
+- **Socket**: `mixxx-fs` creates the socket file on startup.
+
+### How to Test
+1. Start daemon: `./build/tools/mixxx-fs/mixxx-fs /tmp/mountpoint`
+2. Send JSON command via `socat`:
+   ```bash
+   echo '{"op":"register", "backing_file":"/path/to/real.mp3", "size":100000}' | socat - UNIX-CONNECT:/tmp/mixxx-kinetic-bridge.sock
+   ```
+3. Verify file appears in `/tmp/mountpoint`.
+
+### Client IPC Integration (In Progress)
+Started implementing `BridgeClient` in `mixxx-lib` to communicate with the daemon.
+- **Components**: `BridgeClient` class wrapping `QLocalSocket`.
+- **Status**: Compiling `mixxx-lib` and adding unit tests.
+
+
+
+
+
 

@@ -32,10 +32,8 @@ void BeatportService::setupOAuth() {
             kScope);
 
     // Connect to OAuth manager signals
-    connect(m_pOAuthManager, &OAuthManager::tokenRefreshed,
-            this, &BeatportService::onAuthStateChanged);
-    connect(m_pOAuthManager, &OAuthManager::authError,
-            this, &BeatportService::onAuthError);
+    connect(m_pOAuthManager, &OAuthManager::tokenRefreshed, this, &BeatportService::onAuthStateChanged);
+    connect(m_pOAuthManager, &OAuthManager::authError, this, &BeatportService::onAuthError);
 }
 
 void BeatportService::initiateLogin() {
@@ -57,7 +55,7 @@ void BeatportService::logout() {
 
 bool BeatportService::isAuthenticated() const {
     return m_pOAuthManager->hasValidToken(serviceId()) &&
-           m_authState == AuthState::LoggedIn;
+            m_authState == AuthState::LoggedIn;
 }
 
 SubscriptionTier BeatportService::getSubscriptionTier() const {
@@ -313,4 +311,4 @@ QString BeatportService::normalizeArtists(const QJsonArray& artistsArray) {
     return artists.join(", ");
 }
 
-#include "beatportservice.moc"
+#include "moc_beatportservice.cpp"

@@ -364,4 +364,4 @@ void OAuthManager::loadFromKeyring(const QString& serviceId) {
 #endif
 }
 
-#include "oauthmanager.moc"
+#include "moc_oauthmanager.cpp"
