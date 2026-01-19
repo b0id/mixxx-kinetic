@@ -2878,6 +2878,7 @@ if(BUILD_TESTING)
     #TODO: write useful tests for refactored effects system
     #src/test/effectchainslottest.cpp
     src/test/enginebufferscalelineartest.cpp
+    src/test/sources/streamringbuffer_test.cpp
     src/test/bridge/fusedriver_fetch_test.cpp
     src/streaming/bridge/fusedriver.cpp
     src/streaming/bridge/sparsecache.cpp
