@@ -5,13 +5,15 @@
 #include <QVector>
 #include <atomic>
 #include <memory>
+#include <thread>
 
 #include "sources/soundsource.h" // existing mixxx base
-#include "util/defs.h"           // For SINT, etc.
+#include "sources/streamringbuffer.h"
+#include "util/defs.h" // For SINT, etc.
 
 // Forward declaration
-template<typename T, size_t Capacity>
-class StreamRingBuffer;
+// Forward declaration
+// template<typename T> class StreamRingBuffer; // Already included
 
 class SoundSourceKineticProxy : public mixxx::SoundSource {
   public:
@@ -35,6 +37,15 @@ class SoundSourceKineticProxy : public mixxx::SoundSource {
     bool isFullyCached() const;
 
   private:
+    void readWorker();
+
     QString m_virtualPath;
     mixxx::AudioSourcePointer m_pDelegate;
+
+    // RingBuffer for lock-free audio transfer
+    std::unique_ptr<mixxx::StreamRingBuffer<CSAMPLE>> m_pRingBuffer;
+
+    // Worker thread for reading from FUSE
+    std::thread m_readThread;
+    std::atomic<bool> m_stopThread{false};
 };
