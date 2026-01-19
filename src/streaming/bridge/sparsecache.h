@@ -30,6 +30,11 @@ class SparseCache {
     // Get total cached percentage
     double getCachedPercentage() const;
 
+    // Get total size
+    int64_t getTotalSize() const {
+        return m_totalSize;
+    }
+
     // Get all cached ranges (for waveform rendering)
     std::vector<CachedRange> getAllCachedRanges() const;
 

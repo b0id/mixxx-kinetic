@@ -135,6 +135,7 @@ QJsonObject BridgeServer::handleRegisterTrack(const QJsonObject& payload) {
     }
 
     // Register with FuseDriver
+    fuse_ino_t inode = 0;
     if (auto* driver = FuseDriver::instance()) {
         inode = driver->registerFile(backingFile.toStdString(), size);
     } else {
