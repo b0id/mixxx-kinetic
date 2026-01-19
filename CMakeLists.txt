@@ -5437,3 +5437,17 @@ if(APPLE AND MACOS_BUNDLE)
   )
   install(SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/BundleInstall.cmake")
 endif()
+
+# =========================================================================
+# Mixxx Kinetic Extensions
+# =========================================================================
+
+# Include streaming module sources
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/streaming/CMakeLists.txt")
+    include(src/streaming/CMakeLists.txt)
+endif()
+
+# Build FUSE filesystem daemon
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/mixxx-fs/CMakeLists.txt")
+    add_subdirectory(tools/mixxx-fs)
+endif()
