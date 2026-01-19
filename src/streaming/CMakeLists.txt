@@ -11,11 +11,10 @@ target_sources(mixxx-lib PRIVATE
     src/streaming/bridge/sparsecache.cpp
     src/streaming/bridge/bridgeclient.h
     src/streaming/bridge/bridgeclient.cpp
-    # Temporarily disabled until interface fix
-    # src/sources/soundsourcekineticproxy.h
-    # src/sources/soundsourcekineticproxy.cpp
-    # src/sources/soundsourcestream.h
-    # src/sources/soundsourcestream.cpp
+    src/sources/soundsourcekineticproxy.h
+    src/sources/soundsourcekineticproxy.cpp
+    src/sources/soundsourcestream.h
+    src/sources/soundsourcestream.cpp
 )
 
 

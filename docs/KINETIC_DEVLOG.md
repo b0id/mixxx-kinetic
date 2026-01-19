@@ -451,3 +451,48 @@ Started implementing `BridgeClient` in `mixxx-lib` to communicate with the daemo
 
 
 
+
+## [2026-01-19] Client IPC & Remote Build System
+
+### Summary
+Implemented the `BridgeClient` class for communicating with the `mixxx-fs` daemon and established a robust remote build workflow for `chi-big`.
+
+### Actions Taken
+
+#### 1. Client IPC Implementation (`BridgeClient`)
+- **BridgeClient Class**: Created `src/streaming/bridge/bridgeclient.h/.cpp` wrapping `QLocalSocket`.
+- **Functionality**:
+    - `connectToServer()`: Establishes connection to `/tmp/mixxx-kinetic-bridge.sock`.
+    - `registerTrack()`: Sends `REGISTER_TRACK` JSON command, returns `fuse_ino_t` (mapped inode).
+    - `unregisterTrack()`: Sends `UNREGISTER_TRACK` JSON command.
+- **Unit Testing**:
+    - Implemented `src/test/bridgeclient_test.cpp`.
+    - Validated connection, registration, and unregistration against a mock `QLocalServer`.
+    - Fixed timing issues in tests using `waitForReadyRead` and `waitForBytesWritten`.
+
+#### 2. Remote Build Configuration
+- **Objective**: Offload compilation to `chi-big` (3950X/128GB) while maintaining local editing workflow.
+- **Workflow**:
+    - Local changes auto-committed to `dev-build` branch.
+    - Pushed to `chi-big` via script.
+    - Remote structure: `~/repo` (git worktree), `~/repo/build` (CMake build dir).
+- **Scripts**:
+    - `~/bin/remote-build.sh`: Syncs code + runs `cmake --build`.
+    - `~/bin/remote-test.sh`: Runs `ctest` on remote artifacts.
+- **IDE Integration**: Configured `.vscode/tasks.json` for seamless usage (`Ctrl+Shift+B`).
+
+### Verification
+- **IPC**: `BridgeClientTest` passes consistently (verified via `remote-test.sh`).
+- **Build**: Remote build successfully compiles `mixxx-fs`, `mixxx-lib`, and `mixxx-test`.
+
+### Current State
+- **Agent A-HOOK**: Complete.
+- **Agent A-BRIDGE**:
+    - Server: `mixxx-fs` IPC server working.
+    - Client: `BridgeClient` implemented and tested.
+    - File Registration: Functional (Stub -> FUSE).
+- **Agent A-SOURCE**: Disabled.
+
+### Next Steps
+1.  **Integrate BridgeClient**: Connect `BeatportService` (or `SoundSourceKineticProxy` stub) to `BridgeClient` to actually register streamed tracks.
+2.  **Verify End-to-End**: Test registering a real file via `BridgeClient` and reading it through the FUSE mount.
