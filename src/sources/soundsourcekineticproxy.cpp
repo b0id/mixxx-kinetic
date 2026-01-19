@@ -1,5 +1,8 @@
 #include "soundsourcekineticproxy.h"
 
+#include <QFileInfo>
+
+#include "sources/soundsourceproxy.h"
 #include "streaming/bridge/bridgeclient.h"
 #include "util/logger.h"
 
@@ -30,10 +33,7 @@ mixxx::AudioSource::OpenResult SoundSourceKineticProxy::tryOpen(
     }
 
     // REGISTER_TRACK
-    // We need the ACTUAL backing file path (the cache path).
-    // This Proxy class needs to be instantiated with it.
-    // Assuming m_virtualPath is the backing path for now.
-    // Note: registerTrack returns uint64_t (abstracted inode)
+    // We append the extension from the virtual path so the provider can be identified.
     uint64_t inode = client.registerTrack(m_virtualPath, 1024 * 1024 * 10); // Dummy size
     if (inode == 0) {
         kLogger.warning() << "Failed to register track with Bridge";
@@ -41,10 +41,22 @@ mixxx::AudioSource::OpenResult SoundSourceKineticProxy::tryOpen(
     }
 
     // Construct FUSE path
-    QString fusePath = QString("/tmp/mountpoint/%1").arg(inode);
+    QFileInfo fileInfo(m_virtualPath);
+    QString extension = fileInfo.suffix();
+
+    // Append extension to FUSE path so the SoundSourceProvider can recognize it.
+    // The FUSE driver must handle this lookup (or we rely on the inode in the path).
+    QString fusePath = QString("/tmp/mountpoint/%1.%2").arg(inode).arg(extension);
+
+    // Find Provider
+    auto pProvider = mixxx::SoundSourceProxy::getPrimaryProviderForFileType(extension);
+    if (!pProvider) {
+        kLogger.warning() << "No provider found for extension" << extension;
+        return mixxx::AudioSource::OpenResult::Failed;
+    }
 
     // Create delegate
-    m_pDelegate = mixxx::newSoundSourceFromUrl<mixxx::SoundSource>(QUrl::fromLocalFile(fusePath));
+    m_pDelegate = pProvider->newSoundSource(QUrl::fromLocalFile(fusePath));
     if (!m_pDelegate) {
         return mixxx::AudioSource::OpenResult::Failed;
     }
