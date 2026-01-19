@@ -3000,8 +3000,10 @@ if(BUILD_TESTING)
   set_target_properties(mixxx-test PROPERTIES AUTOMOC ON)
   target_link_libraries(
     mixxx-test
-    PRIVATE mixxx-lib mixxx-gitinfostore GTest::gtest GTest::gmock
+    PRIVATE mixxx-lib mixxx-gitinfostore GTest::gtest GTest::gmock ${FUSE3_LIBRARIES}
   )
+  target_include_directories(mixxx-test PRIVATE ${FUSE3_INCLUDE_DIRS})
+  target_compile_definitions(mixxx-test PRIVATE FUSE_USE_VERSION=31)
 
   if(BUILD_BENCH)
     add_compile_definitions(USE_BENCH)
@@ -3624,7 +3626,8 @@ else()
 endif()
 
 # Ogg
-find_package(Ogg REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(FUSE3 fuse3) # Optional generally, but needed for tests if enabled
 target_link_libraries(mixxx-lib PRIVATE Ogg::ogg)
 
 # Vorbis
