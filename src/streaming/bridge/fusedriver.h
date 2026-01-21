@@ -6,6 +6,7 @@
 #include <mutex>
 #include <string>
 
+#include "streaming/bridge/prefetcher.h"
 #include "streaming/bridge/rangefetcher.h"
 #include "streaming/bridge/sparsecache.h"
 
@@ -43,4 +44,5 @@ class FuseDriver {
 
     std::mutex m_mutex;
     mixxx::kinetic::RangeFetcher* m_fetcher;
+    mixxx::kinetic::Prefetcher* m_prefetcher;
 };

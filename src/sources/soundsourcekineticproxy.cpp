@@ -161,73 +161,88 @@ void SoundSourceKineticProxy::close() {
         m_pDelegate.reset();
     }
     m_pRingBuffer.reset();
-    m_nextFrameIndex = 0;   // Reset for next open
-    m_workerFrameIndex = 0; // Reset for next open
-    m_seekPos = -1;         // Reset for next open
+    m_nextFrameIndex = 0; // Reset for next open
+    m_seekPos = -1;       // Reset for next open
 }
 
 void SoundSourceKineticProxy::readWorker() {
     const int kChunkFrames = 4096;
     unsigned int channels = getSignalInfo().getChannelCount();
-    if (channels == 0)
+    if (channels == 0) {
         channels = 2;
+    }
 
-    size_t chunkSizeSamples = kChunkFrames * channels;
-    std::vector<CSAMPLE> buffer(chunkSizeSamples);
+    const size_t chunkSizeSamples = kChunkFrames * channels;
 
-    // Worker's view of current frame
+    // Worker's view of current frame position
     SINT workerFrameIndex = 0;
 
     while (!m_stopThread) {
         // 1. Handle Seek
         int64_t seekTarget = m_seekPos.exchange(-1);
-        if (seekTarget != -1) {
-            if (m_pDelegate) {
-                // Construct WritableSampleFrames wrapper for our buffer
-                mixxx::IndexRange indexRange = mixxx::IndexRange::forward(m_workerFrameIndex, kChunkFrames);
-                mixxx::SampleBuffer sampleBuffer(buffer.data(), chunkSizeSamples);
-                mixxx::WritableSampleFrames frames(indexRange, &sampleBuffer);
+        if (seekTarget != -1 && m_pDelegate) {
+            // For now, we don't have a public seek method - the proxy handles
+            // discontinuities by just reading from new position
+            workerFrameIndex = seekTarget;
+            m_pRingBuffer->reset(); // Flush old data
+        }
 
-                // READ FROM FUSE (Blocking)
-                mixxx::ReadableSampleFrames readFrames = mixxx::AudioSource::readSampleFramesClampedOn(*m_pDelegate, frames);
+        // 2. Read Chunk from FUSE delegate (blocking)
+        if (m_pDelegate) {
+            // Allocate sample buffer for this chunk
+            mixxx::SampleBuffer sampleBuffer(chunkSizeSamples);
 
-                size_t framesRead = readFrames.frameIndexRange().length();
-                size_t samplesRead = framesRead * channels;
+            // Create index range for the frames we want to read
+            mixxx::IndexRange indexRange = mixxx::IndexRange::forward(workerFrameIndex, kChunkFrames);
 
-                if (framesRead == 0) {
-                    // EOF or Error
-                    // Sleep a bit to prevent busy loop if EOF
-                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                    continue;
-                }
+            // Wrap buffer in a WritableSlice
+            mixxx::SampleBuffer::WritableSlice writableSlice(sampleBuffer);
 
-                // Update worker's internal position
-                m_workerFrameIndex += framesRead;
+            // Create WritableSampleFrames
+            mixxx::WritableSampleFrames writableFrames(indexRange, writableSlice);
 
-                // WRITE TO RINGBUFFER
-                size_t written = 0;
-                size_t toWrite = samplesRead;
-                const CSAMPLE* pSrc = buffer.data();
+            // READ FROM FUSE (Blocking)
+            mixxx::ReadableSampleFrames readFrames =
+                    mixxx::AudioSource::readSampleFramesClampedOn(*m_pDelegate, writableFrames);
 
-                while (written < toWrite && !m_stopThread) {
-                    size_t n = m_pRingBuffer->write(pSrc + written, toWrite - written);
-                    written += n;
-                    if (written < toWrite) {
-                        // Buffer full, yield/sleep
-                        std::this_thread::sleep_for(std::chrono::milliseconds(2));
-                    }
+            const SINT framesRead = readFrames.frameIndexRange().length();
+
+            if (framesRead == 0) {
+                // EOF or Error - sleep to prevent busy loop
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                continue;
+            }
+
+            // Update worker's position
+            workerFrameIndex += framesRead;
+
+            // Calculate samples read (frames * channels)
+            const size_t samplesRead = framesRead * channels;
+
+            // WRITE TO RINGBUFFER
+            const CSAMPLE* pSrc = readFrames.readableData();
+            size_t written = 0;
+
+            while (written < samplesRead && !m_stopThread) {
+                size_t n = m_pRingBuffer->write(pSrc + written, samplesRead - written);
+                written += n;
+                if (written < samplesRead) {
+                    // Buffer full, yield/sleep
+                    std::this_thread::sleep_for(std::chrono::milliseconds(2));
                 }
             }
         }
+    }
+}
 
-        double SoundSourceKineticProxy::getCachedPercentage() const {
-            return 0.0;
-        }
+double SoundSourceKineticProxy::getCachedPercentage() const {
+    return 0.0;
+}
 
-        QVector<QPair<qint64, qint64>> SoundSourceKineticProxy::getCachedRanges() const {
-            return {};
-        }
+QVector<QPair<qint64, qint64>> SoundSourceKineticProxy::getCachedRanges() const {
+    return {};
+}
 
-        bool SoundSourceKineticProxy::isFullyCached() const {
-            return false;
-        }
+bool SoundSourceKineticProxy::isFullyCached() const {
+    return false;
+}

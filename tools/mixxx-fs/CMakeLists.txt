@@ -13,6 +13,7 @@ set(MIXXX_FS_SOURCES
     ${CMAKE_SOURCE_DIR}/src/streaming/bridge/fusedriver.cpp
     ${CMAKE_SOURCE_DIR}/src/streaming/bridge/sparsecache.cpp
     ${CMAKE_SOURCE_DIR}/src/streaming/bridge/rangefetcher.cpp
+    ${CMAKE_SOURCE_DIR}/src/streaming/bridge/prefetcher.cpp
     ${CMAKE_SOURCE_DIR}/src/streaming/bridge/bridgeserver.cpp
     ${CMAKE_SOURCE_DIR}/src/streaming/bridge/bridgeserver.h
 )

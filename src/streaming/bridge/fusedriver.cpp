@@ -10,12 +10,16 @@
 FuseDriver* FuseDriver::s_instance = nullptr;
 
 FuseDriver::FuseDriver()
-        : m_fetcher(new mixxx::kinetic::RangeFetcher(nullptr)) {
+        : m_fetcher(new mixxx::kinetic::RangeFetcher(nullptr)),
+          m_prefetcher(new mixxx::kinetic::Prefetcher(m_fetcher)) {
     s_instance = this;
 }
 
 FuseDriver::~FuseDriver() {
-    // Delete fetcher first
+    // Delete prefetcher first (stops worker threads)
+    delete m_prefetcher;
+
+    // Delete fetcher
     delete m_fetcher;
 
     for (auto const& [ino, cache] : m_caches) {
@@ -63,11 +67,21 @@ fuse_ino_t FuseDriver::registerFile(const std::string& backingPath, int64_t size
     m_nameToInode[filename] = ino;
     std::cout << "FuseDriver: Registered " << filename << " -> " << ino << std::endl;
 
+    // Start prefetching if this is a URL
+    if (backingPath.find("http") == 0) {
+        QUrl url(QString::fromStdString(backingPath));
+        m_prefetcher->startPrefetch(ino, url, m_caches[ino], size);
+        std::cout << "FuseDriver: Started prefetch for " << filename << std::endl;
+    }
+
     return ino;
 }
 
 void FuseDriver::unregisterFile(fuse_ino_t ino) {
     std::lock_guard<std::mutex> lock(m_mutex);
+
+    // Stop prefetching
+    m_prefetcher->stopPrefetch(ino);
 
     auto it = m_caches.find(ino);
     if (it != m_caches.end()) {
@@ -195,14 +209,7 @@ void FuseDriver::read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, st
         return;
     }
 
-    // Check if range is cached
-    // In real implementation, we would query cache->isRangeCached().
-    // If not cached, we blocking fetch.
-
-    // Naive fetch-on-read for now:
-    // If we have a URL for this inode, and we blindly assume we need to fetch if the backing file
-    // doesn't have data.
-
+    // Check if we have a URL for this inode (streaming file)
     std::string urlStr;
     {
         std::lock_guard<std::mutex> lock(instance()->m_mutex);
@@ -212,14 +219,30 @@ void FuseDriver::read(fuse_req_t req, fuse_ino_t ino, size_t size, off_t off, st
         }
     }
 
-    if (!urlStr.empty()) {
-        // Fetcher is synchronous for now
-        QByteArray data = instance()->m_fetcher->fetch(QUrl(QString::fromStdString(urlStr)), off, size);
+    // If this is a URL-backed file and the range is not cached
+    if (!urlStr.empty() && !cache->isRangeCached(off, size)) {
+        // Notify prefetcher of potential seek
+        // The prefetcher will prioritize this range if it's far from current sequential position
+        instance()->m_prefetcher->notifySeek(ino, off);
+
+        // Perform synchronous fallback fetch for this specific range
+        // This ensures the read completes even if prefetcher hasn't caught up yet
+        std::cout << "FuseDriver::read: Cache miss at offset " << off
+                  << ", performing fallback fetch (inode " << ino << ")" << std::endl;
+
+        QByteArray data = instance()->m_fetcher->fetch(
+                QUrl(QString::fromStdString(urlStr)), off, size);
         if (!data.isEmpty()) {
             cache->write(data.constData(), data.size(), off);
+            cache->markCached(off, data.size());
+        } else {
+            std::cerr << "FuseDriver::read: Fallback fetch failed!" << std::endl;
+            fuse_reply_err(req, EIO);
+            return;
         }
     }
 
+    // Read from cache (either was already cached or just fetched)
     char* buf = new char[size];
     ssize_t res = cache->read(buf, size, off);
 

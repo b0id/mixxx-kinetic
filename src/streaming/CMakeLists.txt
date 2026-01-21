@@ -11,6 +11,8 @@ target_sources(mixxx-lib PRIVATE
     src/streaming/bridge/sparsecache.cpp
     src/streaming/bridge/bridgeclient.h
     src/streaming/bridge/bridgeclient.cpp
+    src/streaming/bridge/prefetcher.h
+    src/streaming/bridge/prefetcher.cpp
     src/sources/soundsourcekineticproxy.h
     src/sources/soundsourcekineticproxy.cpp
     src/sources/soundsourcestream.h
