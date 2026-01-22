@@ -2,7 +2,7 @@
 set -e
 
 # Configuration
-REMOTE_HOST="chi-big"
+REMOTE_HOST="home"  # SSH hostname for build machine (uses password-protected key)
 REMOTE_DIR="~/repo"
 
 echo "Running tests on $REMOTE_HOST..."

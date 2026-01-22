@@ -1,0 +1,63 @@
+# SSH Configuration for altai (remote workstation)
+# Add this to ~/.ssh/config on altai
+
+# ==================================================================
+# INSTRUCTIONS:
+# 1. On altai: mkdir -p ~/.ssh/sockets
+# 2. Add this configuration to ~/.ssh/config
+# 3. Test: ssh home hostname (will prompt for password ONCE)
+# 4. Then: ./remote-build.sh (no password for 50 minutes!)
+# ==================================================================
+
+Host home
+    HostName colB0idHomeEnd  # or use IP address if DNS doesn't resolve
+    User b0id
+    IdentityFile ~/.ssh/id_ed25519  # Your PASSWORD-PROTECTED key
+
+    # ControlMaster: Reuse SSH connections for 50 minutes
+    ControlMaster auto
+    ControlPath ~/.ssh/sockets/%r@%h-%p
+    ControlPersist 3000  # 50 minutes (3000 seconds)
+
+    # Keep connection alive
+    ServerAliveInterval 60
+    ServerAliveCountMax 3
+
+# GitHub configuration (if not already present)
+Host github.com
+    IdentityFile ~/.ssh/id_ed25519
+    AddKeysToAgent yes
+
+# ==================================================================
+# USAGE:
+#
+# First connection of the session:
+#   ssh home hostname
+#   Password: **** (enter once)
+#
+# Subsequent connections (within 50 minutes):
+#   ./remote-build.sh  # No password!
+#   ./remote-test.sh   # No password!
+#   ssh home           # No password!
+#
+# After 50 minutes of inactivity, next connection will prompt again.
+# ==================================================================
+
+# ==================================================================
+# REMOVING THE PASSWORDLESS KEY (recommended):
+#
+# 1. On altai, find the passwordless key:
+#    ls -la ~/.ssh/
+#    # Look for keys without passwords (test with: ssh-keygen -y -f ~/.ssh/keyname)
+#
+# 2. Remove it from chi-big's authorized_keys:
+#    ssh home  # Using the password-protected key
+#    vim ~/.ssh/authorized_keys
+#    # Delete the line containing the passwordless key's public key
+#    # Save and exit
+#
+# 3. Delete the passwordless key files on altai:
+#    rm ~/.ssh/id_passwordless_key ~/.ssh/id_passwordless_key.pub
+#
+# 4. Remove old chi-big entry from ~/.ssh/config (if it exists)
+# ==================================================================

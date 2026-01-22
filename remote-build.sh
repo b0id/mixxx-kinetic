@@ -2,7 +2,7 @@
 set -e
 
 # Configuration
-REMOTE_HOST="chi-big"  # SSH hostname for build machine
+REMOTE_HOST="home"  # SSH hostname for build machine (uses password-protected key)
 REMOTE_DIR="~/repo"
 BRANCH="dev-build"
 
