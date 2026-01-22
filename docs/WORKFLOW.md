@@ -155,21 +155,41 @@ ctest --output-on-failure
 
 ## SSH Configuration
 
-The `remote-build.sh` and `remote-test.sh` scripts expect an SSH host named `chi-big`. Configure this in `~/.ssh/config` on your remote computer:
+The `remote-build.sh` and `remote-test.sh` scripts expect an SSH host named `home`.
+
+### On altai (remote workstation)
+
+A ready-to-use SSH configuration is available in `ssh-config-for-altai.txt` in the repository. Add this to `~/.ssh/config`:
 
 ```ssh-config
-Host chi-big
-    HostName <your-build-machine-hostname-or-ip>
-    User <your-username>
-    IdentityFile ~/.ssh/id_ed25519
-    # Optional: keep connection alive
+Host home
+    HostName colB0idHomeEnd  # or use IP address
+    User b0id
+    IdentityFile ~/.ssh/id_ed25519  # Password-protected key
+
+    # ControlMaster: Reuse SSH connections for 50 minutes
+    ControlMaster auto
+    ControlPath ~/.ssh/sockets/%r@%h-%p
+    ControlPersist 3000  # 50 minutes
+
     ServerAliveInterval 60
 ```
 
-Test SSH access:
+**First, create the socket directory:**
 ```bash
-ssh chi-big hostname
+mkdir -p ~/.ssh/sockets
 ```
+
+**Test SSH access:**
+```bash
+ssh home hostname
+# Password: **** (enter once)
+
+# Subsequent connections within 50 minutes:
+ssh home hostname  # No password!
+```
+
+**For detailed security guidance**, see [SSH-SECURITY.md](SSH-SECURITY.md).
 
 ## Git Remotes
 
