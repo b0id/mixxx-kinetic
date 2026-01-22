@@ -96,7 +96,8 @@ class PlayerManagerTest : public MixxxDbTest, SoundSourceProviderRegistration {
                 dbConnectionPooler(),
                 m_pTrackCollectionManager.get(),
                 m_pPlayerManager.get(),
-                m_pRecordingManager.get());
+                m_pRecordingManager.get(),
+                nullptr);
 
         m_pPlayerManager->bindToLibrary(m_pLibrary.get());
         RubberBandWorkerPool::createInstance();

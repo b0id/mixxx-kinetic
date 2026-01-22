@@ -4,6 +4,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <QDebug> // For logging
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <algorithm>
 #include <iostream>
 
@@ -16,15 +21,100 @@ SparseCache::SparseCache(const std::string& backingFilePath, int64_t totalSize)
         if (fd >= 0) {
             // Pre-allocate space if possible (optional but good for performance)
             if (m_totalSize > 0) {
-                if (ftruncate(fd, m_totalSize) != 0) {
-                    std::cerr << "SparseCache: Failed to truncate backing file" << std::endl;
+                // Check current size first to avoid truncating existing data?
+                // ftruncate extends OR shrinks.
+                // If it's a new file (size 0), we extend.
+                // If it's existing, we keep it.
+                struct stat st;
+                if (fstat(fd, &st) == 0) {
+                    if (st.st_size == 0) {
+                        if (ftruncate(fd, m_totalSize) != 0) {
+                            std::cerr << "SparseCache: Failed to truncate backing file" << std::endl;
+                        }
+                    }
                 }
             }
             close(fd);
         } else {
             std::cerr << "SparseCache: Failed to open backing file: " << m_backingFilePath << std::endl;
         }
+
+        // Load persistence state
+        loadState();
     }
+}
+
+SparseCache::~SparseCache() {
+    saveState();
+}
+
+void SparseCache::saveState() {
+    if (m_backingFilePath.empty())
+        return;
+
+    QJsonObject root;
+    root["totalSize"] = (qint64)m_totalSize;
+
+    QJsonArray intervalsArr;
+    for (const auto& [start, end] : m_intervals) {
+        QJsonObject interval;
+        interval["start"] = (qint64)start;
+        interval["end"] = (qint64)end;
+        intervalsArr.append(interval);
+    }
+    root["intervals"] = intervalsArr;
+
+    QJsonDocument doc(root);
+
+    QString metaPath = QString::fromStdString(m_backingFilePath) + ".meta";
+    QFile f(metaPath);
+    if (f.open(QIODevice::WriteOnly)) {
+        f.write(doc.toJson());
+        f.close();
+        // qDebug() << "SparseCache: Saved state to" << metaPath; // Logging might be verbose
+    } else {
+        qWarning() << "SparseCache: Failed to save state to" << metaPath;
+    }
+}
+
+void SparseCache::loadState() {
+    if (m_backingFilePath.empty())
+        return;
+
+    QString metaPath = QString::fromStdString(m_backingFilePath) + ".meta";
+    QFile f(metaPath);
+    if (!f.exists() || !f.open(QIODevice::ReadOnly)) {
+        return; // No persistence file, assume empty
+    }
+
+    QJsonDocument doc = QJsonDocument::fromJson(f.readAll());
+    if (doc.isNull() || !doc.isObject()) {
+        qWarning() << "SparseCache: Invalid metadata file" << metaPath;
+        return;
+    }
+
+    QJsonObject root = doc.object();
+    int64_t savedSize = root["totalSize"].toInteger();
+
+    if (savedSize != m_totalSize && m_totalSize > 0) {
+        qWarning() << "SparseCache: Saved size mismatch (" << savedSize << "vs" << m_totalSize << ") - ignoring cache";
+        // Maybe delete the backing file too if size changed?
+        // For now, simple safety: ignore cache.
+        return;
+    }
+
+    QJsonArray intervalsArr = root["intervals"].toArray();
+    for (const QJsonValue& val : intervalsArr) {
+        QJsonObject interval = val.toObject();
+        int64_t start = interval["start"].toInteger();
+        int64_t end = interval["end"].toInteger();
+        if (end > start) {
+            m_intervals[start] = end;
+        }
+    }
+
+    mergeOverlappingIntervals();
+    qDebug() << "SparseCache: Loaded" << m_intervals.size() << "intervals from" << metaPath;
 }
 
 bool SparseCache::isRangeCached(int64_t start, int64_t length) const {

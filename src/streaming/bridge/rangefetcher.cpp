@@ -17,7 +17,8 @@ QByteArray RangeFetcher::fetch(const QUrl& url, qint64 start, qint64 length) {
     request.setRawHeader("Range", rangeHeader.toUtf8());
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
 
-    QNetworkReply* reply = m_nam.get(request);
+    QNetworkAccessManager nam;
+    QNetworkReply* reply = nam.get(request);
 
     // Synchronous wait
     QEventLoop loop;
@@ -40,7 +41,8 @@ qint64 RangeFetcher::fetchSize(const QUrl& url) {
     QNetworkRequest request(url);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
 
-    QNetworkReply* reply = m_nam.head(request);
+    QNetworkAccessManager nam;
+    QNetworkReply* reply = nam.head(request);
 
     QEventLoop loop;
     connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);

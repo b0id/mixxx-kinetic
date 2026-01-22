@@ -24,6 +24,10 @@ class SkinControls;
 class ControlPushButton;
 struct LibraryScanResultSummary;
 
+class QNetworkAccessManager;
+class OAuthManager;
+class StreamingService;
+
 namespace mixxx {
 
 class ControlIndicatorTimer;
@@ -104,6 +108,14 @@ class CoreServices : public QObject {
 
     std::shared_ptr<QDialog> makeDlgPreferences() const;
 
+    std::shared_ptr<StreamingService> getStreamingService() const {
+        return m_pStreamingService;
+    }
+
+    std::shared_ptr<OAuthManager> getOAuthManager() const {
+        return m_pOAuthManager;
+    }
+
   signals:
     void initializationProgressUpdate(int progress, const QString& serviceName);
     void libraryScanSummary(const LibraryScanResultSummary& result);
@@ -141,6 +153,11 @@ class CoreServices : public QObject {
     std::shared_ptr<DbConnectionPool> m_pDbConnectionPool;
     std::shared_ptr<TrackCollectionManager> m_pTrackCollectionManager;
     std::shared_ptr<Library> m_pLibrary;
+
+    // Kinetic Streaming
+    std::shared_ptr<QNetworkAccessManager> m_pNam;
+    std::shared_ptr<OAuthManager> m_pOAuthManager;
+    std::shared_ptr<StreamingService> m_pStreamingService;
 
     std::shared_ptr<KeyboardEventFilter> m_pKeyboardEventFilter;
     std::shared_ptr<ConfigObject<ConfigValueKbd>> m_pKbdConfig;

@@ -61,8 +61,10 @@ class MockNetworkAccessManager : public QNetworkAccessManager {
             const QMap<QString, QString>& params, // Required URL parameters.
             int status,                           // Returned HTTP status code.
             const QByteArray& ret_data);          // Returned data.
-  protected:
+
     MOCK_METHOD3(createRequest, QNetworkReply*(Operation, const QNetworkRequest&, QIODevice*));
+
+  protected:
 };
 
 #endif

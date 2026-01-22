@@ -14,6 +14,7 @@
 #include "moc_dlgpreferences.cpp"
 #include "preferences/dialog/dlgpreflibrary.h"
 #include "preferences/dialog/dlgprefsound.h"
+#include "preferences/dialog/dlgprefstreaming.h"
 #include "util/color/color.h"
 #include "util/desktophelper.h"
 #include "util/widgethelper.h"
@@ -55,7 +56,8 @@ DlgPreferences::DlgPreferences(
         std::shared_ptr<VinylControlManager> pVCManager,
         std::shared_ptr<EffectsManager> pEffectsManager,
         std::shared_ptr<SettingsManager> pSettingsManager,
-        std::shared_ptr<Library> pLibrary)
+        std::shared_ptr<Library> pLibrary,
+        std::shared_ptr<StreamingService> pStreamingService)
         : m_allPages(),
           m_pConfig(pSettingsManager->settings()),
           m_pageSizeHint(QSize(0, 0)) {
@@ -106,7 +108,7 @@ DlgPreferences::DlgPreferences(
             tr("Sound Hardware"),
             "ic_preferences_soundhardware.svg");
 
-    DlgPrefLibrary* plibraryPage = new DlgPrefLibrary(this, m_pConfig, pLibrary);
+    DlgPrefLibrary* plibraryPage = new DlgPrefLibrary(this, m_pConfig, pLibrary, pStreamingService);
     connect(plibraryPage,
             &DlgPrefLibrary::scanLibrary,
             pLibrary->trackCollectionManager(),

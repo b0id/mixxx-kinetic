@@ -42,17 +42,24 @@ class OAuthManager : public QObject {
 
     // Storage (Keyring wrapper interaction)
     bool hasValidToken(const QString& serviceId) const;
-    QString getAccessToken(const QString& serviceId); // Blocking or maybe should return QFuture/Optional?
-                                                      // For now, assuming synchronous lookup from memory/keyring is desired for speed
-                                                      // but keyring on Linux (DBus) can be async.
-                                                      // mixxx typically loads secrets at startup?
-                                                      // Let's implement getting from memory cache which is populated on startup/refresh.
+    QString getAccessToken(const QString& serviceId);
+
+    // Signals
+    // For now, assuming synchronous lookup from memory/keyring is desired for speed
+    // but keyring on Linux (DBus) can be async.
+    // mixxx typically loads secrets at startup?
+    // Let's implement getting from memory cache which is populated on startup/refresh.
 
     // Signals
   signals:
     void tokenRefreshed(const QString& serviceId);
     void authError(const QString& serviceId, const QString& errorMsg);
     void deviceCodeReceived(const QString& serviceId, const QString& userCode, const QString& verificationUrl);
+    void browserUrlReady(const QString& serviceId, const QUrl& url);
+
+  public:
+    QFuture<TokenPair> initiateBrowserFlow(const QString& serviceId);
+    void cancelBrowserFlow();
 
   private:
     QNetworkAccessManager* m_pNam;
@@ -84,4 +91,15 @@ class OAuthManager : public QObject {
     void loadFromKeyring(const QString& serviceId);
     void pollForToken(const QString& serviceId, const QString& deviceCode, int interval);
     void stopPolling(const QString& serviceId);
+
+    // PKCE / Browser Flow
+    class QTcpServer* m_tcpServer;
+    QString m_currentPkceVerifier;
+    QString m_currentServiceId;
+
+    void startLocalServer();
+    void stopLocalServer();
+    void handleNewConnection();
+    QString generateRandomString(int length);
+    QString base64UrlEncode(const QByteArray& data);
 };

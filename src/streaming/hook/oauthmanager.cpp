@@ -1,7 +1,11 @@
 #include "oauthmanager.h"
 
+#include <QCryptographicHash>
 #include <QEventLoop>
 #include <QNetworkAccessManager>
+#include <QRandomGenerator>
+#include <QTcpServer>
+#include <QTcpSocket>
 
 #ifdef __QTKEYCHAIN__
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
@@ -14,7 +18,8 @@ using namespace QKeychain;
 
 OAuthManager::OAuthManager(QNetworkAccessManager* pNam, QObject* parent)
         : QObject(parent),
-          m_pNam(pNam) {
+          m_pNam(pNam),
+          m_tcpServer(nullptr) {
 }
 
 OAuthManager::~OAuthManager() {
@@ -362,6 +367,172 @@ void OAuthManager::loadFromKeyring(const QString& serviceId) {
 #else
     Q_UNUSED(serviceId);
 #endif
+}
+
+// PKCE / Browser Flow Implementation
+
+QString OAuthManager::generateRandomString(int length) {
+    const QString possibleCharacters("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~");
+    QString randomString;
+    for (int i = 0; i < length; ++i) {
+        int index = QRandomGenerator::global()->generate() % possibleCharacters.length();
+        randomString.append(possibleCharacters.at(index));
+    }
+    return randomString;
+}
+
+QString OAuthManager::base64UrlEncode(const QByteArray& data) {
+    return QString::fromLatin1(data.toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals));
+}
+
+QFuture<OAuthManager::TokenPair> OAuthManager::initiateBrowserFlow(const QString& serviceId) {
+    if (!m_services.contains(serviceId)) {
+        emit authError(serviceId, "Service not registered");
+        return QFuture<TokenPair>();
+    }
+
+    // Stop any existing server
+    stopLocalServer();
+
+    m_currentServiceId = serviceId;
+    m_currentPkceVerifier = generateRandomString(128);
+
+    // Create S256 Challenge
+    QByteArray hash = QCryptographicHash::hash(m_currentPkceVerifier.toLatin1(), QCryptographicHash::Sha256);
+    QString challenge = base64UrlEncode(hash);
+
+    // Start Local Server
+    startLocalServer();
+
+    const auto& config = m_services[serviceId];
+    QString redirectUri = "http://localhost:8889/callback";
+
+    QUrl authUrl(config.authUrl);
+    QUrlQuery params;
+    params.addQueryItem("response_type", "code");
+    params.addQueryItem("client_id", config.clientId);
+    params.addQueryItem("redirect_uri", redirectUri);
+    // params.addQueryItem("state", "xyz"); // TODO: Add state
+    if (!config.scope.isEmpty()) {
+        params.addQueryItem("scope", config.scope);
+    }
+    params.addQueryItem("code_challenge", challenge);
+    params.addQueryItem("code_challenge_method", "S256");
+
+    authUrl.setQuery(params);
+
+    emit browserUrlReady(serviceId, authUrl);
+
+    return QFuture<TokenPair>();
+}
+
+void OAuthManager::cancelBrowserFlow() {
+    stopLocalServer();
+}
+
+void OAuthManager::startLocalServer() {
+    if (!m_tcpServer) {
+        m_tcpServer = new QTcpServer(this);
+        connect(m_tcpServer, &QTcpServer::newConnection, this, &OAuthManager::handleNewConnection);
+    }
+    if (!m_tcpServer->isListening()) {
+        if (!m_tcpServer->listen(QHostAddress::LocalHost, 8889)) {
+            emit authError(m_currentServiceId, "Failed to start local server on port 8889");
+        }
+    }
+}
+
+void OAuthManager::stopLocalServer() {
+    if (m_tcpServer && m_tcpServer->isListening()) {
+        m_tcpServer->close();
+    }
+}
+
+void OAuthManager::handleNewConnection() {
+    QTcpSocket* socket = m_tcpServer->nextPendingConnection();
+    connect(socket, &QTcpSocket::readyRead, this, [this, socket]() {
+        QByteArray requestData = socket->readAll();
+        QString request = QString::fromUtf8(requestData);
+
+        // Simple parsing of GET line
+        // GET /callback?code=XXXX HTTP/1.1
+        QStringList lines = request.split("\r\n");
+        if (lines.isEmpty())
+            return;
+
+        QStringList parts = lines[0].split(" ");
+        if (parts.length() < 2)
+            return;
+
+        QString path = parts[1];
+        QUrl url("http://localhost:8889" + path);
+        QUrlQuery query(url.query());
+
+        QString code = query.queryItemValue("code");
+        QString error = query.queryItemValue("error");
+
+        if (!code.isEmpty()) {
+            // Send Success Response
+            QString response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<h1>Login Successful</h1><p>You can close this window and return to Mixxx.</p><script>window.close();</script>";
+            socket->write(response.toUtf8());
+            socket->flush();
+            socket->disconnectFromHost(); // wait for bytes written?
+
+            // Exchange code for token
+            // TODO: Move to helper
+            const auto& config = m_services[m_currentServiceId];
+
+            QNetworkRequest tokenReq(config.tokenUrl);
+            tokenReq.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
+
+            QUrlQuery params;
+            params.addQueryItem("grant_type", "authorization_code");
+            params.addQueryItem("code", code);
+            params.addQueryItem("redirect_uri", "http://localhost:8889/callback");
+            params.addQueryItem("client_id", config.clientId);
+            params.addQueryItem("code_verifier", m_currentPkceVerifier);
+            // params.addQueryItem("client_secret", config.clientSecret); // Not needed for PKCE usually, but maybe?
+
+            QNetworkReply* reply = m_pNam->post(tokenReq, params.toString(QUrl::FullyEncoded).toUtf8());
+            connect(reply, &QNetworkReply::finished, this, [this, reply, serviceId = m_currentServiceId]() {
+                reply->deleteLater();
+                if (reply->error() != QNetworkReply::NoError) {
+                    emit authError(serviceId, reply->errorString());
+                    return;
+                }
+
+                QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+                QJsonObject obj = doc.object();
+
+                TokenPair tokens;
+                tokens.accessToken = obj["access_token"].toString();
+                tokens.refreshToken = obj["refresh_token"].toString();
+                int expiresIn = obj["expires_in"].toInt(3600);
+                tokens.expiresAt = QDateTime::currentDateTime().addSecs(expiresIn);
+                tokens.scope = obj["scope"].toString();
+
+                if (tokens.accessToken.isEmpty()) {
+                    emit authError(serviceId, "Invalid response: Missing access_token");
+                    return;
+                }
+
+                m_tokenCache.insert(serviceId, tokens);
+                saveToKeyring(serviceId, tokens);
+                emit tokenRefreshed(serviceId);
+
+                // Stop server
+                stopLocalServer();
+            });
+
+        } else {
+            QString response = "HTTP/1.1 400 Bad Request\r\n\r\nError";
+            socket->write(response.toUtf8());
+            socket->disconnectFromHost();
+            if (!error.isEmpty()) {
+                emit authError(m_currentServiceId, error);
+            }
+        }
+    });
 }
 
 #include "moc_oauthmanager.cpp"

@@ -12,7 +12,9 @@
 class StreamingService : public QObject {
     Q_OBJECT
   public:
-    explicit StreamingService(QObject* parent = nullptr) : QObject(parent) {}
+    explicit StreamingService(QObject* parent = nullptr)
+            : QObject(parent) {
+    }
     virtual ~StreamingService() = default;
 
     // Identity
@@ -37,6 +39,14 @@ class StreamingService : public QObject {
     void authStateChanged(AuthState newState);
     void loginError(const QString& message);
     void tokenRefreshed();
+
+    // UI Convenience Signals
+    void searchResultsReceived(const QVector<TrackMetadata>& results);
+    void streamInfoReceived(const StreamInfo& info);
+    void errorOccurred(const QString& message);
+
+    // Auth flow
+    void deviceAuthReady(const QString& userCode, const QUrl& verificationUrl);
 
   protected:
     // Subclasses implement these

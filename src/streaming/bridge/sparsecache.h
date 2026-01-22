@@ -13,6 +13,7 @@ class SparseCache {
     };
 
     SparseCache(const std::string& backingFilePath, int64_t totalSize);
+    ~SparseCache();
 
     // Check if byte range is fully cached
     bool isRangeCached(int64_t start, int64_t length) const;
@@ -37,6 +38,10 @@ class SparseCache {
 
     // Get all cached ranges (for waveform rendering)
     std::vector<CachedRange> getAllCachedRanges() const;
+
+    // Persistence
+    void saveState();
+    void loadState();
 
   private:
     std::string m_backingFilePath;

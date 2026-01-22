@@ -20,6 +20,8 @@
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
 #include "moc_dlgpreflibrary.cpp"
+#include "streaming/hook/streamingservice.h"
+#include "streaming/ui/logindialog.h"
 #include "util/desktophelper.h"
 #include "widget/wsearchlineedit.h"
 
@@ -32,16 +34,71 @@ using namespace mixxx::library::prefs;
 DlgPrefLibrary::DlgPrefLibrary(
         QWidget* pParent,
         UserSettingsPointer pConfig,
-        std::shared_ptr<Library> pLibrary)
+        std::shared_ptr<Library> pLibrary,
+        std::shared_ptr<StreamingService> pStreamingService)
         : DlgPreferencePage(pParent),
           m_dirListModel(),
           m_pConfig(pConfig),
           m_pLibrary(pLibrary),
+          m_pStreamingService(pStreamingService),
           m_bAddedDirectory(false),
           m_iOriginalTrackTableRowHeight(Library::kDefaultRowHeightPx),
           m_pRateRangeDeck1(make_parented<ControlProxy>(
                   QStringLiteral("[Channel1]"), QStringLiteral("rateRange"), this)) {
     setupUi(this);
+
+    // KINETIC STREAMING INTEGRATION
+    if (m_pStreamingService) {
+        auto* mainLayout = qobject_cast<QVBoxLayout*>(layout());
+        if (mainLayout) {
+            auto* group = new QGroupBox(tr("Kinetic Streaming Services"), this);
+            auto* groupLayout = new QVBoxLayout(group);
+
+            auto* rowLayout = new QHBoxLayout();
+            auto* label = new QLabel(m_pStreamingService->serviceName(), group);
+            auto* statusLabel = new QLabel(tr("Status: Unknown"), group);
+            auto* loginBtn = new QPushButton(tr("Login"), group);
+
+            rowLayout->addWidget(label);
+            rowLayout->addWidget(statusLabel);
+            rowLayout->addWidget(loginBtn);
+            rowLayout->addStretch();
+            groupLayout->addLayout(rowLayout);
+
+            if (mainLayout->count() > 0) {
+                // Insert before proper spacer (last item)
+                mainLayout->insertWidget(mainLayout->count() - 1, group);
+            } else {
+                mainLayout->addWidget(group);
+            }
+
+            // Logic
+            auto updateState = [this, statusLabel, loginBtn]() {
+                if (m_pStreamingService->isAuthenticated()) {
+                    statusLabel->setText(tr("Status: <b>Logged In</b>"));
+                    loginBtn->setText(tr("Logout"));
+                } else {
+                    statusLabel->setText(tr("Status: Not Logged In"));
+                    loginBtn->setText(tr("Login"));
+                }
+            };
+
+            connect(loginBtn, &QPushButton::clicked, this, [this, updateState]() {
+                if (m_pStreamingService->isAuthenticated()) {
+                    m_pStreamingService->logout();
+                    updateState();
+                } else {
+                    mixxx::kinetic::LoginDialog dlg(m_pStreamingService.get(), this);
+                    if (dlg.exec() == QDialog::Accepted) {
+                        updateState();
+                    }
+                }
+            });
+
+            // Initial state
+            updateState();
+        }
+    }
 
     connect(pushButton_add_dir,
             &QPushButton::clicked,
@@ -184,11 +241,12 @@ void DlgPrefLibrary::slotHide() {
     QMessageBox msgBox;
     msgBox.setIcon(QMessageBox::Warning);
     msgBox.setWindowTitle(tr("Music Directory Added"));
-    msgBox.setText(tr("You added one or more music directories. The tracks in "
-                      "these directories won't be available until you rescan "
-                      "your library. Would you like to rescan now?"));
+    msgBox.setText(tr(
+            "You added one or more music directories. The tracks in "
+            "these directories won't be available until you rescan "
+            "your library. Would you like to rescan now?"));
     QPushButton* scanButton = msgBox.addButton(
-        tr("Scan"), QMessageBox::AcceptRole);
+            tr("Scan"), QMessageBox::AcceptRole);
     msgBox.addButton(QMessageBox::Cancel);
     msgBox.setDefaultButton(scanButton);
     msgBox.exec();
@@ -231,7 +289,7 @@ void DlgPrefLibrary::populateDirList() {
     dirList->setModel(&m_dirListModel);
     dirList->setCurrentIndex(m_dirListModel.index(0, 0));
     // reselect index if it still exists
-    for (int i=0 ; i<m_dirListModel.rowCount() ; ++i) {
+    for (int i = 0; i < m_dirListModel.rowCount(); ++i) {
         const QModelIndex index = m_dirListModel.index(i, 0);
         if (index.data().toString() == selected) {
             dirList->setCurrentIndex(index);
@@ -297,15 +355,15 @@ void DlgPrefLibrary::slotUpdate() {
             kUseRelativePathOnExportConfigKey, false));
 
     checkBox_show_rhythmbox->setChecked(m_pConfig->getValue(
-            ConfigKey("[Library]","ShowRhythmboxLibrary"), true));
+            ConfigKey("[Library]", "ShowRhythmboxLibrary"), true));
     checkBox_show_banshee->setChecked(m_pConfig->getValue(
-            ConfigKey("[Library]","ShowBansheeLibrary"), true));
+            ConfigKey("[Library]", "ShowBansheeLibrary"), true));
     checkBox_show_itunes->setChecked(m_pConfig->getValue(
-            ConfigKey("[Library]","ShowITunesLibrary"), true));
+            ConfigKey("[Library]", "ShowITunesLibrary"), true));
     checkBox_show_traktor->setChecked(m_pConfig->getValue(
-            ConfigKey("[Library]","ShowTraktorLibrary"), true));
+            ConfigKey("[Library]", "ShowTraktorLibrary"), true));
     checkBox_show_rekordbox->setChecked(m_pConfig->getValue(
-            ConfigKey("[Library]","ShowRekordboxLibrary"), true));
+            ConfigKey("[Library]", "ShowRekordboxLibrary"), true));
     checkBox_show_serato->setChecked(m_pConfig->getValue(
             ConfigKey("[Library]", "ShowSeratoLibrary"), true));
 
@@ -404,8 +462,7 @@ void DlgPrefLibrary::resetLibraryFont() {
 
 void DlgPrefLibrary::slotAddDir() {
     QString fd = QFileDialog::getExistingDirectory(
-        this, tr("Choose a music directory"),
-        QStandardPaths::writableLocation(QStandardPaths::MusicLocation));
+            this, tr("Choose a music directory"), QStandardPaths::writableLocation(QStandardPaths::MusicLocation));
     if (!fd.isEmpty()) {
         if (m_pLibrary->requestAddDir(fd)) {
             populateDirList();
@@ -423,29 +480,29 @@ void DlgPrefLibrary::slotRemoveDir() {
     removeMsgBox.setWindowTitle(tr("Confirm Directory Removal"));
 
     removeMsgBox.setText(tr(
-        "Mixxx will no longer watch this directory for new tracks. "
-        "What would you like to do with the tracks from this directory and "
-        "subdirectories?"
-        "<ul>"
-        "<li>Hide all tracks from this directory and subdirectories.</li>"
-        "<li>Delete all metadata for these tracks from Mixxx permanently.</li>"
-        "<li>Leave the tracks unchanged in your library.</li>"
-        "</ul>"
-        "Hiding tracks saves their metadata in case you re-add them in the "
-        "future."));
+            "Mixxx will no longer watch this directory for new tracks. "
+            "What would you like to do with the tracks from this directory and "
+            "subdirectories?"
+            "<ul>"
+            "<li>Hide all tracks from this directory and subdirectories.</li>"
+            "<li>Delete all metadata for these tracks from Mixxx permanently.</li>"
+            "<li>Leave the tracks unchanged in your library.</li>"
+            "</ul>"
+            "Hiding tracks saves their metadata in case you re-add them in the "
+            "future."));
     removeMsgBox.setInformativeText(tr(
-        "Metadata means all track details (artist, title, playcount, etc.) as "
-        "well as beatgrids, hotcues, and loops. This choice only affects the "
-        "Mixxx library. No files on disk will be changed or deleted."));
+            "Metadata means all track details (artist, title, playcount, etc.) as "
+            "well as beatgrids, hotcues, and loops. This choice only affects the "
+            "Mixxx library. No files on disk will be changed or deleted."));
 
     QPushButton* cancelButton =
             removeMsgBox.addButton(QMessageBox::Cancel);
     QPushButton* hideAllButton = removeMsgBox.addButton(
-        tr("Hide Tracks"), QMessageBox::AcceptRole);
+            tr("Hide Tracks"), QMessageBox::AcceptRole);
     QPushButton* deleteAllButton = removeMsgBox.addButton(
-        tr("Delete Track Metadata"), QMessageBox::AcceptRole);
+            tr("Delete Track Metadata"), QMessageBox::AcceptRole);
     QPushButton* leaveUnchangedButton = removeMsgBox.addButton(
-        tr("Leave Tracks Unchanged"), QMessageBox::AcceptRole);
+            tr("Leave Tracks Unchanged"), QMessageBox::AcceptRole);
     Q_UNUSED(leaveUnchangedButton); // Only used in DEBUG_ASSERT
     removeMsgBox.setDefaultButton(cancelButton);
     removeMsgBox.exec();
@@ -487,7 +544,7 @@ void DlgPrefLibrary::slotRelocateDir() {
     }
 
     QString fd = QFileDialog::getExistingDirectory(
-        this, tr("Relink music directory to new location"), startDir);
+            this, tr("Relink music directory to new location"), startDir);
 
     if (!fd.isEmpty() && m_pLibrary->requestRelocateDir(currentFd, fd)) {
         populateDirList();
@@ -541,16 +598,16 @@ void DlgPrefLibrary::slotApply() {
             ConfigValue(checkBox_enable_search_history_shortcuts->isChecked()));
     updateSearchLineEditHistoryOptions();
 
-    m_pConfig->set(ConfigKey("[Library]","ShowRhythmboxLibrary"),
-                ConfigValue((int)checkBox_show_rhythmbox->isChecked()));
-    m_pConfig->set(ConfigKey("[Library]","ShowBansheeLibrary"),
-                ConfigValue((int)checkBox_show_banshee->isChecked()));
-    m_pConfig->set(ConfigKey("[Library]","ShowITunesLibrary"),
-                ConfigValue((int)checkBox_show_itunes->isChecked()));
-    m_pConfig->set(ConfigKey("[Library]","ShowTraktorLibrary"),
-                ConfigValue((int)checkBox_show_traktor->isChecked()));
-    m_pConfig->set(ConfigKey("[Library]","ShowRekordboxLibrary"),
-                ConfigValue((int)checkBox_show_rekordbox->isChecked()));
+    m_pConfig->set(ConfigKey("[Library]", "ShowRhythmboxLibrary"),
+            ConfigValue((int)checkBox_show_rhythmbox->isChecked()));
+    m_pConfig->set(ConfigKey("[Library]", "ShowBansheeLibrary"),
+            ConfigValue((int)checkBox_show_banshee->isChecked()));
+    m_pConfig->set(ConfigKey("[Library]", "ShowITunesLibrary"),
+            ConfigValue((int)checkBox_show_itunes->isChecked()));
+    m_pConfig->set(ConfigKey("[Library]", "ShowTraktorLibrary"),
+            ConfigValue((int)checkBox_show_traktor->isChecked()));
+    m_pConfig->set(ConfigKey("[Library]", "ShowRekordboxLibrary"),
+            ConfigValue((int)checkBox_show_rekordbox->isChecked()));
     m_pConfig->set(ConfigKey("[Library]", "ShowSeratoLibrary"),
             ConfigValue((int)checkBox_show_serato->isChecked()));
 
@@ -587,14 +644,14 @@ void DlgPrefLibrary::slotApply() {
     QFont font = m_pLibrary->getTrackTableFont();
     if (m_originalTrackTableFont != font) {
         m_pConfig->set(ConfigKey("[Library]", "Font"),
-                       ConfigValue(font.toString()));
+                ConfigValue(font.toString()));
         m_originalTrackTableFont = font;
     }
 
     int rowHeight = spinBox_row_height->value();
     if (m_iOriginalTrackTableRowHeight != rowHeight) {
-        m_pConfig->set(ConfigKey("[Library]","RowHeight"),
-                       ConfigValue(rowHeight));
+        m_pConfig->set(ConfigKey("[Library]", "RowHeight"),
+                ConfigValue(rowHeight));
         m_iOriginalTrackTableRowHeight = rowHeight;
     }
 
@@ -660,8 +717,7 @@ void DlgPrefLibrary::setLibraryFont(const QFont& font) {
 void DlgPrefLibrary::slotSelectFont() {
     // False if the user cancels font selection.
     bool ok = false;
-    QFont font = QFontDialog::getFont(&ok, m_pLibrary->getTrackTableFont(),
-                                      this, tr("Select Library Font"));
+    QFont font = QFontDialog::getFont(&ok, m_pLibrary->getTrackTableFont(), this, tr("Select Library Font"));
     if (ok) {
         setLibraryFont(font);
     }

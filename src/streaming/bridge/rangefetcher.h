@@ -26,7 +26,6 @@ class RangeFetcher : public QObject {
     qint64 fetchSize(const QUrl& url);
 
   private:
-    QNetworkAccessManager m_nam;
 };
 
 } // namespace kinetic

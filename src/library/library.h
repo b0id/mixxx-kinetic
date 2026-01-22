@@ -33,7 +33,13 @@ class TrackCollectionManager;
 class WSearchLineEdit;
 class WLibrarySidebar;
 class WLibrary;
+class SidebarModel;
+class TrackCollectionManager;
+class WSearchLineEdit;
+class WLibrarySidebar;
+class WLibrary;
 class QAbstractItemModel;
+class StreamingService;
 
 #ifdef __ENGINEPRIME__
 namespace mixxx {
@@ -43,7 +49,7 @@ class LibraryExporter;
 
 // A Library class is a container for all the model-side aspects of the library.
 // A library widget can be attached to the Library object by calling bindLibraryWidget.
-class Library: public QObject {
+class Library : public QObject {
     Q_OBJECT
 
   public:
@@ -52,7 +58,8 @@ class Library: public QObject {
             mixxx::DbConnectionPoolPtr pDbConnectionPool,
             TrackCollectionManager* pTrackCollectionManager,
             PlayerManager* pPlayerManager,
-            RecordingManager* pRecordingManager);
+            RecordingManager* pRecordingManager,
+            std::shared_ptr<StreamingService> pStreamingService);
     ~Library() override;
 
     void stopPendingTasks();
@@ -70,7 +77,7 @@ class Library: public QObject {
     void bindSearchboxWidget(WSearchLineEdit* pSearchboxWidget);
     void bindSidebarWidget(WLibrarySidebar* sidebarWidget);
     void bindLibraryWidget(WLibrary* libraryWidget,
-                    KeyboardEventFilter* pKeyboard);
+            KeyboardEventFilter* pKeyboard);
 
     void addFeature(LibraryFeature* feature);
 
@@ -91,7 +98,7 @@ class Library: public QObject {
         return m_editMetadataSelectedClick;
     }
 
-    //static Library* buildDefaultLibrary();
+    // static Library* buildDefaultLibrary();
 
     static const int kDefaultRowHeightPx;
 
@@ -178,8 +185,8 @@ class Library: public QObject {
     void onTrackAnalyzerProgress(TrackId trackId, AnalyzerProgress analyzerProgress);
 
   private slots:
-      void onPlayerManagerTrackAnalyzerProgress(TrackId trackId, AnalyzerProgress analyzerProgress);
-      void onPlayerManagerTrackAnalyzerIdle();
+    void onPlayerManagerTrackAnalyzerProgress(TrackId trackId, AnalyzerProgress analyzerProgress);
+    void onPlayerManagerTrackAnalyzerIdle();
 
   private:
     const UserSettingsPointer m_pConfig;
@@ -205,4 +212,5 @@ class Library: public QObject {
     int m_iTrackTableRowHeight;
     bool m_editMetadataSelectedClick;
     std::unique_ptr<ControlObject> m_pKeyNotation;
+    std::shared_ptr<StreamingService> m_pStreamingService;
 };

@@ -12,8 +12,9 @@
 
 class QWidget;
 class ControlProxy;
+class StreamingService;
 
-class DlgPrefLibrary : public DlgPreferencePage, public Ui::DlgPrefLibraryDlg  {
+class DlgPrefLibrary : public DlgPreferencePage, public Ui::DlgPrefLibraryDlg {
     Q_OBJECT
   public:
     enum class TrackDoubleClickAction : int {
@@ -33,7 +34,8 @@ class DlgPrefLibrary : public DlgPreferencePage, public Ui::DlgPrefLibraryDlg  {
     DlgPrefLibrary(
             QWidget* pParent,
             UserSettingsPointer pConfig,
-            std::shared_ptr<Library> pLibrary);
+            std::shared_ptr<Library> pLibrary,
+            std::shared_ptr<StreamingService> pStreamingService);
     ~DlgPrefLibrary() override;
 
     QUrl helpUrl() const override;
@@ -78,6 +80,7 @@ class DlgPrefLibrary : public DlgPreferencePage, public Ui::DlgPrefLibraryDlg  {
     QStandardItemModel m_dirListModel;
     UserSettingsPointer m_pConfig;
     std::shared_ptr<Library> m_pLibrary;
+    std::shared_ptr<StreamingService> m_pStreamingService;
     bool m_bAddedDirectory;
     QFont m_originalTrackTableFont;
     int m_iOriginalTrackTableRowHeight;

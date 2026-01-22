@@ -35,16 +35,45 @@ mixxx::AudioSource::OpenResult SoundSourceKineticProxy::tryOpen(
         return mixxx::AudioSource::OpenResult::Failed;
     }
 
-    // REGISTER_TRACK
-    uint64_t inode = client.registerTrack(m_virtualPath, 1024 * 1024 * 10); // Dummy size
+    // KINETIC: Parse Manifest
+    // The m_virtualPath points to a local .knt file which is a JSON manifest
+    // containing the actual stream info.
+    QFile manifestFile(m_virtualPath);
+    if (!manifestFile.open(QIODevice::ReadOnly)) {
+        kLogger.warning() << "Failed to open manifest file:" << m_virtualPath;
+        return mixxx::AudioSource::OpenResult::Failed;
+    }
+
+    QJsonDocument doc = QJsonDocument::fromJson(manifestFile.readAll());
+    if (doc.isNull()) {
+        kLogger.warning() << "Invalid manifest JSON:" << m_virtualPath;
+        return mixxx::AudioSource::OpenResult::Failed;
+    }
+
+    QJsonObject obj = doc.object();
+    QString streamUrl = obj["url"].toString(); // The HLS/HTTP URL
+    QString extension = obj["extension"].toString();
+    // We could also extract 'id', 'bitrate', etc.
+
+    if (streamUrl.isEmpty()) {
+        kLogger.warning() << "Manifest missing 'url' field:" << m_virtualPath;
+        return mixxx::AudioSource::OpenResult::Failed;
+    }
+
+    // REGISTER_TRACK with the REMOTE URL
+    // TODO: Pass actual size if known, or dummy.
+    uint64_t inode = client.registerTrack(streamUrl, 1024 * 1024 * 100); // Dummy size (100MB)
     if (inode == 0) {
         kLogger.warning() << "Failed to register track with Bridge";
         return mixxx::AudioSource::OpenResult::Failed;
     }
 
     // Construct FUSE path
-    QFileInfo fileInfo(m_virtualPath);
-    QString extension = fileInfo.suffix();
+    // Use the extension from manifest, or fallback to file extension
+    if (extension.isEmpty()) {
+        QFileInfo fileInfo(m_virtualPath);
+        extension = fileInfo.suffix();
+    }
 
     // Append extension to FUSE path so the SoundSourceProvider can recognize it.
     QString fusePath = QString("/tmp/mountpoint/%1.%2").arg(inode).arg(extension);

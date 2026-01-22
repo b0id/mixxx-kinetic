@@ -204,6 +204,7 @@ class SoundSourceProxy {
 
     friend class TrackCollectionManager;
     FRIEND_TEST(TrackMetadataExportTest, keepWithespaceKey);
+    friend class HeadlessPlaybackTest;
     static ExportTrackMetadataResult exportTrackMetadataBeforeSaving(
             Track* pTrack,
             const SyncTrackMetadataParams& syncParams);

@@ -10,6 +10,7 @@
 #include "library/autodj/autodjfeature.h"
 #include "library/banshee/bansheefeature.h"
 #include "library/browse/browsefeature.h"
+#include "streaming/hook/beatportfeature.h"
 #ifdef __ENGINEPRIME__
 #include "library/export/libraryexporter.h"
 #endif
@@ -64,7 +65,8 @@ Library::Library(
         mixxx::DbConnectionPoolPtr pDbConnectionPool,
         TrackCollectionManager* pTrackCollectionManager,
         PlayerManager* pPlayerManager,
-        RecordingManager* pRecordingManager)
+        RecordingManager* pRecordingManager,
+        std::shared_ptr<StreamingService> pStreamingService)
         : QObject(parent),
           m_pConfig(pConfig),
           m_pDbConnectionPool(std::move(pDbConnectionPool)),
@@ -72,8 +74,10 @@ Library::Library(
           m_pSidebarModel(make_parented<SidebarModel>(this)),
           m_pLibraryControl(make_parented<LibraryControl>(this)),
           m_pLibraryWidget(nullptr),
+          m_editMetadataSelectedClick(false), // Initialize bool member
           m_pKeyNotation(std::make_unique<ControlObject>(
-                  mixxx::library::prefs::kKeyNotationConfigKey)) {
+                  mixxx::library::prefs::kKeyNotationConfigKey)),
+          m_pStreamingService(pStreamingService) {
     qRegisterMetaType<LibraryRemovalType>("LibraryRemovalType");
 
     connect(m_pTrackCollectionManager,
@@ -87,6 +91,19 @@ Library::Library(
             this,
             m_pConfig);
     addFeature(m_pMixxxLibraryFeature);
+
+    // Add Beatport Feature
+    if (m_pStreamingService) {
+        // Reuse make_parented or new? AddFeature takes raw pointer.
+        // But features are usually parented_ptr or new.
+        // addFeature takes ownership via m_features (QList<LibraryFeature*>) doesn't imply ownership?
+        // Other features are created with new or make_parented.
+        // Looking at code: m_pAutoDJFeature = make_parented... addFeature(m_pAutoDJFeature).
+        // RhythmboxFeature is new RhythmboxFeature... addFeature().
+        // Library destructor doesn't seem to delete them explicitly? QObject parent handles it.
+        // Yes, `this` passed as parent.
+        addFeature(new BeatportFeature(this, m_pConfig, m_pStreamingService));
+    }
 #ifdef __ENGINEPRIME__
     connect(m_pMixxxLibraryFeature,
             &MixxxLibraryFeature::exportLibrary,

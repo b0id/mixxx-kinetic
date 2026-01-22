@@ -35,6 +35,19 @@ void BeatportService::setupOAuth() {
     // Connect to OAuth manager signals
     connect(m_pOAuthManager, &OAuthManager::tokenRefreshed, this, &BeatportService::onAuthStateChanged);
     connect(m_pOAuthManager, &OAuthManager::authError, this, &BeatportService::onAuthError);
+    connect(m_pOAuthManager, &OAuthManager::deviceCodeReceived, this, [this](const QString& serviceId, const QString& userCode, const QString& url) {
+        if (serviceId == this->serviceId()) {
+            emit deviceAuthReady(userCode, QUrl(url));
+        }
+    });
+
+    // Connect browser flow
+    connect(m_pOAuthManager, &OAuthManager::browserUrlReady, this, [this](const QString& serviceId, const QUrl& url) {
+        if (serviceId == this->serviceId()) {
+            // Emitting empty userCode implies Browser Flow
+            emit deviceAuthReady(QString(), url);
+        }
+    });
 }
 
 void BeatportService::initiateLogin() {
@@ -42,7 +55,8 @@ void BeatportService::initiateLogin() {
     emit authStateChanged(m_authState);
 
     // Start the device flow
-    m_pOAuthManager->initiateDeviceFlow(serviceId());
+    // Start the browser flow (PKCE)
+    m_pOAuthManager->initiateBrowserFlow(serviceId());
 }
 
 void BeatportService::logout() {
@@ -202,7 +216,7 @@ QFuture<QVector<TrackMetadata>> BeatportService::search(const SearchQuery& query
             tracks.append(parseTrackMetadata(value.toObject()));
         }
 
-        // TODO: Signal or return through QPromise
+        emit searchResultsReceived(tracks);
     });
 
     return QFuture<QVector<TrackMetadata>>();
@@ -282,7 +296,7 @@ QFuture<StreamInfo> BeatportService::getStreamInfo(const QString& trackId) {
         // URL TTL is typically 1 hour
         info.expiresAt = QDateTime::currentDateTime().addSecs(3600);
 
-        // TODO: Signal or return through QPromise
+        emit streamInfoReceived(info);
     });
 
     return QFuture<StreamInfo>();

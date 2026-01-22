@@ -48,8 +48,12 @@
 #include "qml/qmlpreferencesproxy.h"
 #include "qml/qmlsoundmanagerproxy.h"
 #endif
+#include <QNetworkAccessManager>
+
 #include "soundio/soundmanager.h"
 #include "sources/soundsourceproxy.h"
+#include "streaming/hook/beatportservice.h"
+#include "streaming/hook/oauthmanager.h"
 #include "util/clipboard.h"
 #include "util/db/dbconnectionpooled.h"
 #include "util/font.h"
@@ -74,6 +78,7 @@
 
 #if defined(Q_OS_LINUX) && QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
 #include <X11/Xlibint.h>
+
 #include <QtX11Extras/QX11Info>
 
 #include "engine/channelhandle.h"
@@ -374,6 +379,11 @@ CoreServices::CoreServices(const CmdlineArgs& args, QApplication* pApp)
     mixxx::Translations::initializeTranslations(
             m_pSettingsManager->settings(), pApp, m_cmdlineArgs.getLocale());
     initializeKeyboard();
+
+    // Initialize Kinetic Streaming Services
+    m_pNam = std::make_shared<QNetworkAccessManager>();
+    m_pOAuthManager = std::make_shared<OAuthManager>(m_pNam.get());
+    m_pStreamingService = std::make_shared<BeatportService>(m_pNam.get(), m_pOAuthManager.get());
 }
 
 CoreServices::~CoreServices() {
@@ -600,7 +610,8 @@ void CoreServices::initialize(QApplication* pApp) {
             m_pDbConnectionPool,
             m_pTrackCollectionManager.get(),
             m_pPlayerManager.get(),
-            m_pRecordingManager.get());
+            m_pRecordingManager.get(),
+            m_pStreamingService);
 
     OverviewCache* pOverviewCache = OverviewCache::createInstance(pConfig, m_pDbConnectionPool);
     connect(&(m_pTrackCollectionManager->internalCollection()->getTrackDAO()),
@@ -851,11 +862,11 @@ void CoreServices::initializeKeyboard() {
 void CoreServices::slotOptionsKeyboard(bool toggle) {
     UserSettingsPointer pConfig = m_pSettingsManager->settings();
     if (toggle) {
-        //qDebug() << "Enable keyboard shortcuts/mappings";
+        // qDebug() << "Enable keyboard shortcuts/mappings";
         m_pKeyboardEventFilter->setKeyboardConfig(m_pKbdConfig.get());
         pConfig->set(ConfigKey("[Keyboard]", "Enabled"), ConfigValue(1));
     } else {
-        //qDebug() << "Disable keyboard shortcuts/mappings";
+        // qDebug() << "Disable keyboard shortcuts/mappings";
         m_pKeyboardEventFilter->setKeyboardConfig(m_pKbdConfigEmpty.get());
         pConfig->set(ConfigKey("[Keyboard]", "Enabled"), ConfigValue(0));
     }
@@ -891,7 +902,8 @@ std::shared_ptr<QDialog> CoreServices::makeDlgPreferences() const {
             getVinylControlManager(),
             getEffectsManager(),
             getSettingsManager(),
-            getLibrary());
+            getLibrary(),
+            getStreamingService());
     return pDlgPreferences;
 }
 
