@@ -363,7 +363,7 @@ QString BeatportService::normalizeArtists(const QJsonArray& artistsArray) {
 
 void BeatportService::authenticate(const QString& username, const QString& password) {
     if (username.isEmpty() || password.isEmpty()) {
-        emit authError(serviceId(), "Username and password required");
+        emit loginError("Username and password required");
         return;
     }
 
@@ -430,7 +430,7 @@ void BeatportService::authorizeWithSession(const QString& sessionId) {
     // Manually set cookie header
     req.setRawHeader("Cookie", QString("sessionid=%1").arg(sessionId).toUtf8());
     // Don't follow redirects automatically, we want the Location header
-    req.setAttribute(QNetworkRequest::FollowRedirectsAttribute, false);
+    req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
 
     QNetworkReply* reply = m_pNam->get(req);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
