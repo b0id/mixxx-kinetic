@@ -381,7 +381,7 @@ void BeatportService::authenticate(const QString& username, const QString& passw
         loginReply->deleteLater();
 
         if (loginReply->error() != QNetworkReply::NoError) {
-            emit authError(serviceId(), QString("Login failed: %1").arg(loginReply->errorString()));
+            emit loginError(QString("Login failed: %1").arg(loginReply->errorString()));
             return;
         }
 
@@ -410,7 +410,7 @@ void BeatportService::authenticate(const QString& username, const QString& passw
         }
 
         if (sessionId.isEmpty()) {
-            emit authError(serviceId(), "Login failed - no session cookie found");
+            emit loginError("Login failed - no session cookie found");
             return;
         }
 
@@ -443,7 +443,7 @@ void BeatportService::authorizeWithSession(const QString& sessionId) {
             // But usually redirects to callback.
             // If we get 200, maybe we need to parse HTML?
             // For now assume redirect.
-            emit authError(serviceId(), QString("Authorize failed: Status %1").arg(statusCode.toInt()));
+            emit loginError(QString("Authorize failed: Status %1").arg(statusCode.toInt()));
             return;
         }
 
@@ -454,7 +454,7 @@ void BeatportService::authorizeWithSession(const QString& sessionId) {
         QString code = locQuery.queryItemValue("code");
 
         if (code.isEmpty()) {
-            emit authError(serviceId(), "Authorize failed: No code in redirect");
+            emit loginError("Authorize failed: No code in redirect");
             return;
         }
 
@@ -480,7 +480,7 @@ void BeatportService::exchangeCodeForToken(const QString& code) {
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         reply->deleteLater();
         if (reply->error() != QNetworkReply::NoError) {
-            emit authError(serviceId(), QString("Token exchange failed: %1").arg(reply->errorString()));
+            emit loginError(QString("Token exchange failed: %1").arg(reply->errorString()));
             return;
         }
 
@@ -494,7 +494,7 @@ void BeatportService::exchangeCodeForToken(const QString& code) {
         tokens.scope = obj["scope"].toString();
 
         if (tokens.accessToken.isEmpty()) {
-            emit authError(serviceId(), "Token exchange failed: Empty access token");
+            emit loginError("Token exchange failed: Empty access token");
             return;
         }
 
