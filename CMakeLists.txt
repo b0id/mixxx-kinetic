@@ -2994,6 +2994,8 @@ if(BUILD_TESTING)
     target_link_libraries(mixxx-beatport-verify PRIVATE mixxx-lib mixxx-gitinfostore Qt6::Core Qt6::Network)
   endif()
 
+  set_target_properties(mixxx-beatport-verify PROPERTIES AUTOMOC ON)
+
   if(HID)
     target_sources(
       mixxx-test
