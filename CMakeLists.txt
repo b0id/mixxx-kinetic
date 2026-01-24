@@ -2987,7 +2987,7 @@ if(BUILD_TESTING)
   add_executable(mixxx-beatport-verify 
       src/test/beatport_integration_test.cpp 
   )
-  target_link_libraries(mixxx-beatport-verify PRIVATE mixxx-lib mixxx-qml-lib Qt6::Core Qt6::Network)
+  target_link_libraries(mixxx-beatport-verify PRIVATE mixxx-lib mixxx-qml-lib mixxx-lib Qt6::Core Qt6::Network)
 
   if(HID)
     target_sources(
