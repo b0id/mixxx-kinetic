@@ -2985,9 +2985,10 @@ if(BUILD_TESTING)
   add_executable(mixxx-test ${src-mixxx-test})
 
   add_executable(mixxx-beatport-verify 
-      src/test/beatport_integration_test.cpp 
+      src/test/beatport_integration_test.cpp
+      src/control/control.cpp
   )
-  target_link_libraries(mixxx-beatport-verify PRIVATE mixxx-lib mixxx-qml-lib mixxx-lib Qt6::Core Qt6::Network)
+  target_link_libraries(mixxx-beatport-verify PRIVATE mixxx-lib Qt6::Core Qt6::Network)
 
   if(HID)
     target_sources(
