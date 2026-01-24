@@ -2986,9 +2986,12 @@ if(BUILD_TESTING)
 
   add_executable(mixxx-beatport-verify 
       src/test/beatport_integration_test.cpp
-      src/control/control.cpp
   )
-  target_link_libraries(mixxx-beatport-verify PRIVATE mixxx-lib Qt6::Core Qt6::Network)
+  if(UNIX AND NOT APPLE)
+    target_link_libraries(mixxx-beatport-verify PRIVATE -Wl,--whole-archive mixxx-lib -Wl,--no-whole-archive Qt6::Core Qt6::Network)
+  else()
+    target_link_libraries(mixxx-beatport-verify PRIVATE mixxx-lib Qt6::Core Qt6::Network)
+  endif()
 
   if(HID)
     target_sources(
