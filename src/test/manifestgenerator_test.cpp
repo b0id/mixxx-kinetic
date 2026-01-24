@@ -14,7 +14,7 @@ namespace mixxx {
 namespace kinetic {
 
 TEST(ManifestGeneratorTest, GeneratesValidJson) {
-    TrackMetadata track;
+    StreamTrackMetadata track;
     track.remoteId = "12345";
     track.title = "Test Track";
     track.artist = "Test Artist";
@@ -44,7 +44,7 @@ TEST(ManifestGeneratorTest, GeneratesValidJson) {
 }
 
 TEST(ManifestGeneratorTest, HandlesEmptyUrl) {
-    TrackMetadata track;
+    StreamTrackMetadata track;
     track.remoteId = "12345";
 
     QString path = ManifestGenerator::generate(track, "", "mp3", 320);
