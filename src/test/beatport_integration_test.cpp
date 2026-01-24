@@ -33,8 +33,8 @@ int main(int argc, char* argv[]) {
         QCoreApplication::exit(1);
     });
 
-    QObject::connect(&service, &BeatportService::authStateChanged, [&](StreamingService::AuthState state) {
-        if (state == StreamingService::AuthState::LoggedIn) {
+    QObject::connect(&service, &BeatportService::authStateChanged, [&](AuthState state) {
+        if (state == AuthState::LoggedIn) {
             qDebug() << "Authentication Successful!";
             qDebug() << "Fetching stream info for track:" << trackId;
             service.getStreamInfo(trackId);
