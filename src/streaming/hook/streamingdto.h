@@ -55,7 +55,9 @@ struct StreamInfo {
     int bitrate;         // kbps
     bool encrypted;      // DRM protected
     QString licenseUrl;  // Widevine license server (if encrypted)
+    QString licenseUrl;  // Widevine license server (if encrypted)
     QString keyId;       // DRM key ID (if encrypted)
+    int durationMs;
 };
 
 struct SearchQuery {
