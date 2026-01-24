@@ -463,7 +463,8 @@ void BeatportService::authorizeWithSession(const QString& sessionId) {
 }
 
 void BeatportService::exchangeCodeForToken(const QString& code) {
-    QNetworkRequest req(QUrl(kTokenUrl));
+    QNetworkRequest req;
+    req.setUrl(QUrl(kTokenUrl));
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
 
     QUrlQuery params;
