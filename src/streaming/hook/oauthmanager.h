@@ -39,6 +39,7 @@ class OAuthManager : public QObject {
     // Flow Management
     QFuture<TokenPair> initiateDeviceFlow(const QString& serviceId);
     QFuture<TokenPair> refreshTokens(const QString& serviceId);
+    void setAccessTokens(const QString& serviceId, const TokenPair& tokens);
 
     // Storage (Keyring wrapper interaction)
     bool hasValidToken(const QString& serviceId) const;

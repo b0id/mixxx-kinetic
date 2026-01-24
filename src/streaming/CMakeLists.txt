@@ -29,6 +29,8 @@ target_sources(mixxx-lib PRIVATE
     src/sources/soundsourcekineticproxy.cpp
     src/sources/soundsourcestream.h
     src/sources/soundsourcestream.cpp
+    src/streaming/hls/hlsparser.h
+    src/streaming/hls/hlsparser.cpp
 )
 
 

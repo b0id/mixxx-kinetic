@@ -9,6 +9,7 @@
 #include <QUrlQuery>
 
 #include "oauthmanager.h"
+#include "streaming/hls/hlsparser.h"
 
 BeatportService::BeatportService(QNetworkAccessManager* pNam, OAuthManager* pOAuthManager, QObject* parent)
         : StreamingService(parent),
@@ -229,20 +230,15 @@ QFuture<QVector<TrackMetadata>> BeatportService::getPlaylist(const QString& play
 }
 
 QFuture<StreamInfo> BeatportService::getStreamInfo(const QString& trackId) {
-    QString accessToken = m_pOAuthManager->getAccessToken(serviceId());
-    if (accessToken.isEmpty()) {
+    if (!m_pOAuthManager->hasValidToken(serviceId())) {
         return QFuture<StreamInfo>();
     }
 
-    QUrl url(QString("%1/catalog/tracks/%2/stream").arg(kBaseUrl, trackId));
-    QUrlQuery urlQuery;
-    // Request high quality if we have Premium/Pro subscription
-    if (m_subscriptionTier >= SubscriptionTier::Premium) {
-        urlQuery.addQueryItem("quality", "high");
-    }
-    url.setQuery(urlQuery);
+    // Use the streaming endpoint (HLS)
+    QUrl url(QString("%1/catalog/tracks/%2/stream/").arg(kBaseUrl, trackId));
 
     QNetworkRequest request(url);
+    QString accessToken = m_pOAuthManager->getAccessToken(serviceId());
     request.setRawHeader("Authorization", QString("Bearer %1").arg(accessToken).toUtf8());
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     request.setRawHeader("User-Agent", "Mixxx-Kinetic/1.0");
@@ -259,44 +255,58 @@ QFuture<StreamInfo> BeatportService::getStreamInfo(const QString& trackId) {
         QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
         QJsonObject obj = doc.object();
 
-        StreamInfo info;
-        info.trackId = trackId;
-
-        // KINETIC: Write Manifest File (.knt)
-        // Instead of returning the raw HLS URL, we write a manifest file that the
-        // SoundSourceKineticProvider will recognize.
-
-        QJsonObject manifest;
-        manifest["url"] = obj["stream_url"].toString();
-        manifest["id"] = trackId;
-        manifest["extension"] = "mp3"; // Beatport stream is usually aac/mp3, but let's say mp3 for broad compat
-        // Note: Real mp4/aac support in FUSE requires appropriate Provider matching.
-
-        QJsonDocument manifestDoc(manifest);
-        QString tempPath = QString("/tmp/beatport_%1.knt").arg(trackId);
-        QFile tempFile(tempPath);
-        if (tempFile.open(QIODevice::WriteOnly)) {
-            tempFile.write(manifestDoc.toJson());
-            tempFile.close();
-            // Return the local manifest path as the "stream URL" to be loaded by Engine
-            info.streamUrl = QUrl::fromLocalFile(tempPath);
-        } else {
-            qWarning() << "BeatportService: Failed to write manifest to" << tempPath;
-            info.streamUrl = QUrl(); // Fail
+        QString streamUrl = obj["stream_url"].toString();
+        if (streamUrl.isEmpty()) {
+            qWarning() << "BeatportService: No stream_url in response";
+            return;
         }
 
-        info.mimeType = "application/vnd.apple.mpegurl"; // HLS
-        info.codec = "aac";
-        info.encrypted = false; // Beatport typically unencrypted
+        // Fetch the M3U8 manifest to verify/prepare
+        QNetworkRequest m3u8Req(streamUrl);
+        // No auth needed for manifest usually, but let's see. Guide says public once generated.
+        QNetworkReply* m3u8Reply = m_pNam->get(m3u8Req);
+        connect(m3u8Reply, &QNetworkReply::finished, this, [this, m3u8Reply, trackId, streamUrl, obj]() {
+            m3u8Reply->deleteLater();
 
-        // Determine bitrate from quality
-        QString quality = obj["quality"].toString();
-        info.bitrate = (quality == "high") ? 256 : 128;
+            if (m3u8Reply->error() != QNetworkReply::NoError) {
+                qWarning() << "BeatportService: Failed to fetch M3U8:" << m3u8Reply->errorString();
+                return;
+            }
 
-        // URL TTL is typically 1 hour
-        info.expiresAt = QDateTime::currentDateTime().addSecs(3600);
+            QByteArray m3u8Content = m3u8Reply->readAll();
+            HlsParser parser;
+            if (!parser.parse(m3u8Content, m3u8Reply->url())) {
+                qWarning() << "BeatportService: Failed to parse M3U8";
+                return;
+            }
 
-        emit streamInfoReceived(info);
+            // Successfully parsed HLS.
+            // For now, we return the HLS URL.
+            // In a full implementation, we might pre-fetch the key here or notify the FUSE layer.
+
+            StreamInfo info;
+            info.trackId = trackId;
+            info.streamUrl = QUrl(streamUrl);
+            info.mimeType = "application/vnd.apple.mpegurl";
+            info.codec = "aac";
+            info.encrypted = true; // HLS is encrypted
+            info.bitrate = 128;    // Always 128k for streaming
+
+            // Duration from JSON (sample_end_ms) or Parser?
+            // JSON sample_end_ms should be accurate for full track if authorized correctly
+            info.durationMs = obj["sample_end_ms"].toInt();
+
+            // Set expiry
+            // The URL expires, typically 1 hour?
+            info.expiresAt = QDateTime::currentDateTime().addSecs(3600);
+
+            // Emit result
+            emit streamInfoReceived(info);
+
+            // Optional: Fetch Key immediately to cache it?
+            // HlsKey key = parser.key();
+            // if (!key.uri.isEmpty()) { ... }
+        });
     });
 
     return QFuture<StreamInfo>();
@@ -347,6 +357,148 @@ QString BeatportService::normalizeArtists(const QJsonArray& artistsArray) {
         artists.append(artistObj["name"].toString());
     }
     return artists.join(", ");
+}
+
+void BeatportService::authenticate(const QString& username, const QString& password) {
+    if (username.isEmpty() || password.isEmpty()) {
+        emit authError(serviceId(), "Username and password required");
+        return;
+    }
+
+    QUrl loginUrl(QString("%1/auth/login/").arg(kBaseUrl));
+    QNetworkRequest loginReq(loginUrl);
+    loginReq.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    loginReq.setRawHeader("User-Agent", "Mixxx-Kinetic/1.0");
+
+    QJsonObject loginBody;
+    loginBody["username"] = username;
+    loginBody["password"] = password;
+
+    QNetworkReply* loginReply = m_pNam->post(loginReq, QJsonDocument(loginBody).toJson());
+    connect(loginReply, &QNetworkReply::finished, this, [this, loginReply]() {
+        loginReply->deleteLater();
+
+        if (loginReply->error() != QNetworkReply::NoError) {
+            emit authError(serviceId(), QString("Login failed: %1").arg(loginReply->errorString()));
+            return;
+        }
+
+        // Extract sessionid cookie
+        QList<QNetworkCookie> cookies = m_pNam->cookieJar()->cookiesForUrl(loginReply->url());
+        QString sessionId;
+        for (const auto& cookie : cookies) {
+            if (cookie.name() == "sessionid") {
+                sessionId = cookie.value();
+                break;
+            }
+        }
+
+        // Also check if set-cookie header has it manually if cookiejar fails
+        if (sessionId.isEmpty()) {
+            QVariant cookieVar = loginReply->header(QNetworkRequest::SetCookieHeader);
+            if (cookieVar.isValid()) {
+                QList<QNetworkCookie> headers = cookieVar.value<QList<QNetworkCookie>>();
+                for (const auto& cookie : headers) {
+                    if (cookie.name() == "sessionid") {
+                        sessionId = cookie.value();
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (sessionId.isEmpty()) {
+            emit authError(serviceId(), "Login failed - no session cookie found");
+            return;
+        }
+
+        // Step 2: Authorize
+        authorizeWithSession(sessionId);
+    });
+}
+
+void BeatportService::authorizeWithSession(const QString& sessionId) {
+    QUrl authUrl(kAuthUrl);
+    QUrlQuery query;
+    query.addQueryItem("client_id", kClientId);
+    query.addQueryItem("response_type", "code");
+    authUrl.setQuery(query);
+
+    QNetworkRequest req(authUrl);
+    // Manually set cookie header
+    req.setRawHeader("Cookie", QString("sessionid=%1").arg(sessionId).toUtf8());
+    // Don't follow redirects automatically, we want the Location header
+    req.setAttribute(QNetworkRequest::FollowRedirectsAttribute, false);
+
+    QNetworkReply* reply = m_pNam->get(req);
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        reply->deleteLater();
+
+        // Expecting 302 Found
+        QVariant statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+        if (statusCode.toInt() != 302) {
+            // Sometimes it might return 200 if already authorized? Or 403?
+            // But usually redirects to callback.
+            // If we get 200, maybe we need to parse HTML?
+            // For now assume redirect.
+            emit authError(serviceId(), QString("Authorize failed: Status %1").arg(statusCode.toInt()));
+            return;
+        }
+
+        QString location = reply->header(QNetworkRequest::LocationHeader).toString();
+        // Location: http://localhost:8889/callback?code=...
+        QUrl locationUrl(location);
+        QUrlQuery locQuery(locationUrl.query());
+        QString code = locQuery.queryItemValue("code");
+
+        if (code.isEmpty()) {
+            emit authError(serviceId(), "Authorize failed: No code in redirect");
+            return;
+        }
+
+        exchangeCodeForToken(code);
+    });
+}
+
+void BeatportService::exchangeCodeForToken(const QString& code) {
+    QNetworkRequest req(kTokenUrl);
+    req.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
+
+    QUrlQuery params;
+    params.addQueryItem("grant_type", "authorization_code");
+    params.addQueryItem("code", code);
+    params.addQueryItem("client_id", kClientId);
+    // Redirect URI must match what was implied or configured.
+    // If we used the browser flow stub, it used localhost:8889.
+    // The previous manual flow assumed specific redirect URI?
+    // beatportdl uses "http://localhost:8889/callback"
+    params.addQueryItem("redirect_uri", "http://localhost:8889/callback");
+
+    QNetworkReply* reply = m_pNam->post(req, params.toString(QUrl::FullyEncoded).toUtf8());
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) {
+            emit authError(serviceId(), QString("Token exchange failed: %1").arg(reply->errorString()));
+            return;
+        }
+
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        QJsonObject obj = doc.object();
+
+        OAuthManager::TokenPair tokens;
+        tokens.accessToken = obj["access_token"].toString();
+        tokens.refreshToken = obj["refresh_token"].toString();
+        tokens.expiresAt = QDateTime::currentDateTime().addSecs(obj["expires_in"].toInt(3600));
+        tokens.scope = obj["scope"].toString();
+
+        if (tokens.accessToken.isEmpty()) {
+            emit authError(serviceId(), "Token exchange failed: Empty access token");
+            return;
+        }
+
+        // Set tokens in OAuthManager
+        m_pOAuthManager->setAccessTokens(serviceId(), tokens);
+    });
 }
 
 #include "moc_beatportservice.cpp"

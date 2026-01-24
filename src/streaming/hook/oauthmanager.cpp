@@ -159,6 +159,12 @@ QFuture<OAuthManager::TokenPair> OAuthManager::refreshTokens(const QString& serv
     return QFuture<TokenPair>();
 }
 
+void OAuthManager::setAccessTokens(const QString& serviceId, const TokenPair& tokens) {
+    m_tokenCache.insert(serviceId, tokens);
+    saveToKeyring(serviceId, tokens);
+    emit tokenRefreshed(serviceId);
+}
+
 bool OAuthManager::hasValidToken(const QString& serviceId) const {
     return m_tokenCache.contains(serviceId);
 }

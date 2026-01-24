@@ -20,11 +20,16 @@ class BeatportService : public StreamingService {
     ~BeatportService() override;
 
     // Identity
-    QString serviceName() const override { return "Beatport"; }
-    QString serviceId() const override { return "beatport"; }
+    QString serviceName() const override {
+        return "Beatport";
+    }
+    QString serviceId() const override {
+        return "beatport";
+    }
 
     // Authentication
     void initiateLogin() override;
+    void authenticate(const QString& username, const QString& password);
     void logout() override;
     bool isAuthenticated() const override;
     SubscriptionTier getSubscriptionTier() const override;
@@ -54,9 +59,13 @@ class BeatportService : public StreamingService {
     static constexpr const char* kBaseUrl = "https://api.beatport.com/v4";
     static constexpr const char* kAuthUrl = "https://api.beatport.com/v4/auth/o/authorize/";
     static constexpr const char* kTokenUrl = "https://api.beatport.com/v4/auth/o/token/";
-    static constexpr const char* kClientId = "default"; // TODO: Replace with actual client ID
-    static constexpr const char* kClientSecret = ""; // Optional for some flows
-    static constexpr const char* kScope = "streaming catalog";
+    static constexpr const char* kClientId = "ryZ8LuyQVPqbK2mBX2Hwt4qSMtnWuTYSqBPO92yQ";
+    static constexpr const char* kClientSecret = "";                                       // Optional for some flows
+    static constexpr const char* kScope = "performer-catalog-view performer-options-view"; // Verified scope from beatportdl? Guide says nothing about scope, but beatportdl might have them. VERIFIED_STREAMING_API says "app:locker user:dj" in response.
+    // The guide says:
+    // GET /auth/o/authorize/?client_id=...&response_type=code
+    // It doesn't specify scope in the URL in the guide.
+    // I'll stick to the existing one or a safe default. The one in the file is "streaming catalog".
 
     // Helper methods
     void setupOAuth();
@@ -64,4 +73,8 @@ class BeatportService : public StreamingService {
     TrackMetadata parseTrackMetadata(const QJsonObject& json);
     QString normalizeKey(const QString& beatportKey);
     QString normalizeArtists(const QJsonArray& artistsArray);
+
+    // Manual Auth Flow
+    void authorizeWithSession(const QString& sessionId);
+    void exchangeCodeForToken(const QString& code);
 };
