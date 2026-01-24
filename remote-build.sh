@@ -19,4 +19,4 @@ git push origin HEAD:$BRANCH
 
 # Trigger remote build via SSH
 echo "Triggering remote build on $REMOTE_HOST..."
-ssh $REMOTE_HOST "cd $REMOTE_DIR && git pull origin $BRANCH && cmake --build build -j\$(nproc)"
+ssh $REMOTE_HOST "cd $REMOTE_DIR && git stash && git pull origin $BRANCH && cmake --build build -j\$(nproc)"
