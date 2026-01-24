@@ -30,7 +30,7 @@ enum class OfflineStatus {
     OfflinePermanent = 3
 };
 
-struct TrackMetadata {
+struct StreamTrackMetadata {
     QString remoteId; // Service-specific ID
     QString title;
     QString artist; // Normalized, comma-separated

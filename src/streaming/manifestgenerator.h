@@ -14,13 +14,13 @@ class ManifestGenerator {
     // Returns the absolute path to the generated file, or empty string on failure.
     // The file will be created in a standard temporary location.
     static QString generate(
-            const TrackMetadata& track,
+            const StreamTrackMetadata& track,
             const QString& streamUrl,
             const QString& extension,
             int bitrate);
 
     // Helper that takes a full StreamInfo object if available (future)
-    // static QString generate(const TrackMetadata& track, const StreamInfo& streamInfo);
+    // static QString generate(const StreamTrackMetadata& track, const StreamInfo& streamInfo);
 };
 
 } // namespace kinetic

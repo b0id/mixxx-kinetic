@@ -35,9 +35,9 @@ class BeatportService : public StreamingService {
     SubscriptionTier getSubscriptionTier() const override;
 
     // Catalog
-    QFuture<TrackMetadata> fetchTrackMetadata(const QString& trackId) override;
-    QFuture<QVector<TrackMetadata>> search(const SearchQuery& query) override;
-    QFuture<QVector<TrackMetadata>> getPlaylist(const QString& playlistId) override;
+    QFuture<StreamTrackMetadata> fetchTrackMetadata(const QString& trackId) override;
+    QFuture<QVector<StreamTrackMetadata>> search(const SearchQuery& query) override;
+    QFuture<QVector<StreamTrackMetadata>> getPlaylist(const QString& playlistId) override;
 
     // Streaming
     QFuture<StreamInfo> getStreamInfo(const QString& trackId) override;
@@ -70,7 +70,7 @@ class BeatportService : public StreamingService {
     // Helper methods
     void setupOAuth();
     void fetchSubscriptionInfo();
-    TrackMetadata parseTrackMetadata(const QJsonObject& json);
+    StreamTrackMetadata parseTrackMetadata(const QJsonObject& json);
     QString normalizeKey(const QString& beatportKey);
     QString normalizeArtists(const QJsonArray& artistsArray);
 

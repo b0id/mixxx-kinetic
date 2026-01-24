@@ -28,9 +28,9 @@ class StreamingService : public QObject {
     virtual SubscriptionTier getSubscriptionTier() const = 0;
 
     // Catalog
-    virtual QFuture<TrackMetadata> fetchTrackMetadata(const QString& trackId) = 0;
-    virtual QFuture<QVector<TrackMetadata>> search(const SearchQuery& query) = 0;
-    virtual QFuture<QVector<TrackMetadata>> getPlaylist(const QString& playlistId) = 0;
+    virtual QFuture<StreamTrackMetadata> fetchTrackMetadata(const QString& trackId) = 0;
+    virtual QFuture<QVector<StreamTrackMetadata>> search(const SearchQuery& query) = 0;
+    virtual QFuture<QVector<StreamTrackMetadata>> getPlaylist(const QString& playlistId) = 0;
 
     // Streaming
     virtual QFuture<StreamInfo> getStreamInfo(const QString& trackId) = 0;
@@ -41,7 +41,7 @@ class StreamingService : public QObject {
     void tokenRefreshed();
 
     // UI Convenience Signals
-    void searchResultsReceived(const QVector<TrackMetadata>& results);
+    void searchResultsReceived(const QVector<StreamTrackMetadata>& results);
     void streamInfoReceived(const StreamInfo& info);
     void errorOccurred(const QString& message);
 

@@ -17,7 +17,7 @@ const Logger kLogger("ManifestGenerator");
 }
 
 QString ManifestGenerator::generate(
-        const TrackMetadata& track,
+        const StreamTrackMetadata& track,
         const QString& streamUrl,
         const QString& extension,
         int bitrate) {

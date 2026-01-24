@@ -65,7 +65,7 @@ void StreamBrowserWidget::search(const QString& query) {
     m_service->search(q);
 }
 
-void StreamBrowserWidget::onResults(const QVector<TrackMetadata>& results) {
+void StreamBrowserWidget::onResults(const QVector<StreamTrackMetadata>& results) {
     m_searchBox->setEnabled(true);
     m_currentResults = results;
     m_resultsList->clear();
@@ -93,7 +93,7 @@ void StreamBrowserWidget::onLoadClicked() {
     if (row < 0 || row >= m_currentResults.size())
         return;
 
-    const TrackMetadata& track = m_currentResults[row];
+    const StreamTrackMetadata& track = m_currentResults[row];
     kLogger.info() << "Requesting stream info for" << track.remoteId;
 
     // We need to fetch stream info first.

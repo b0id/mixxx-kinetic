@@ -27,7 +27,7 @@ class StreamBrowserWidget : public QWidget {
 
   private slots:
     void onSearchReturnPressed();
-    void onResults(const QVector<TrackMetadata>& results);
+    void onResults(const QVector<StreamTrackMetadata>& results);
     void onLoadClicked();
     void onItemDoubleClicked(QListWidgetItem* item);
 
@@ -37,7 +37,7 @@ class StreamBrowserWidget : public QWidget {
     QListWidget* m_resultsList;
 
     // Store metadata for current results
-    QVector<TrackMetadata> m_currentResults;
+    QVector<StreamTrackMetadata> m_currentResults;
 };
 
 } // namespace kinetic

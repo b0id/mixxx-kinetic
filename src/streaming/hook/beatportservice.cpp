@@ -145,11 +145,11 @@ void BeatportService::fetchSubscriptionInfo() {
     });
 }
 
-QFuture<TrackMetadata> BeatportService::fetchTrackMetadata(const QString& trackId) {
+QFuture<StreamTrackMetadata> BeatportService::fetchTrackMetadata(const QString& trackId) {
     QString accessToken = m_pOAuthManager->getAccessToken(serviceId());
     if (accessToken.isEmpty()) {
         // Return empty future - TODO: use QPromise for proper future handling
-        return QFuture<TrackMetadata>();
+        return QFuture<StreamTrackMetadata>();
     }
 
     QUrl url(QString("%1/catalog/tracks/%2").arg(kBaseUrl, trackId));
@@ -170,17 +170,17 @@ QFuture<TrackMetadata> BeatportService::fetchTrackMetadata(const QString& trackI
         QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
         QJsonObject obj = doc.object();
 
-        TrackMetadata metadata = parseTrackMetadata(obj);
+        StreamTrackMetadata metadata = parseTrackMetadata(obj);
         // TODO: Signal or return through QPromise
     });
 
-    return QFuture<TrackMetadata>();
+    return QFuture<StreamTrackMetadata>();
 }
 
-QFuture<QVector<TrackMetadata>> BeatportService::search(const SearchQuery& query) {
+QFuture<QVector<StreamTrackMetadata>> BeatportService::search(const SearchQuery& query) {
     QString accessToken = m_pOAuthManager->getAccessToken(serviceId());
     if (accessToken.isEmpty()) {
-        return QFuture<QVector<TrackMetadata>>();
+        return QFuture<QVector<StreamTrackMetadata>>();
     }
 
     QUrl url(QString("%1/catalog/search").arg(kBaseUrl));
@@ -214,7 +214,7 @@ QFuture<QVector<TrackMetadata>> BeatportService::search(const SearchQuery& query
         QJsonObject obj = doc.object();
         QJsonArray results = obj["results"].toArray();
 
-        QVector<TrackMetadata> tracks;
+        QVector<StreamTrackMetadata> tracks;
         for (const QJsonValue& value : results) {
             tracks.append(parseTrackMetadata(value.toObject()));
         }
@@ -222,13 +222,13 @@ QFuture<QVector<TrackMetadata>> BeatportService::search(const SearchQuery& query
         emit searchResultsReceived(tracks);
     });
 
-    return QFuture<QVector<TrackMetadata>>();
+    return QFuture<QVector<StreamTrackMetadata>>();
 }
 
-QFuture<QVector<TrackMetadata>> BeatportService::getPlaylist(const QString& playlistId) {
+QFuture<QVector<StreamTrackMetadata>> BeatportService::getPlaylist(const QString& playlistId) {
     // TODO: Implement playlist fetching
     Q_UNUSED(playlistId);
-    return QFuture<QVector<TrackMetadata>>();
+    return QFuture<QVector<StreamTrackMetadata>>();
 }
 
 QFuture<StreamInfo> BeatportService::getStreamInfo(const QString& trackId) {
@@ -314,8 +314,8 @@ QFuture<StreamInfo> BeatportService::getStreamInfo(const QString& trackId) {
     return QFuture<StreamInfo>();
 }
 
-TrackMetadata BeatportService::parseTrackMetadata(const QJsonObject& json) {
-    TrackMetadata metadata;
+StreamTrackMetadata BeatportService::parseTrackMetadata(const QJsonObject& json) {
+    StreamTrackMetadata metadata;
 
     metadata.remoteId = QString::number(json["id"].toInt());
     metadata.title = json["name"].toString();
