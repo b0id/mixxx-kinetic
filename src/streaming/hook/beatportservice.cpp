@@ -367,21 +367,32 @@ void BeatportService::authenticate(const QString& username, const QString& passw
         return;
     }
 
+    qDebug() << "BeatportService: Authenticating user:" << username;
+
     QUrl loginUrl(QString("%1/auth/login/").arg(kBaseUrl));
     QNetworkRequest loginReq(loginUrl);
     loginReq.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    loginReq.setRawHeader("User-Agent", "Mixxx-Kinetic/1.0");
+    // Use a standard browser User-Agent to avoid blocking
+    loginReq.setRawHeader("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+    // Add Referer as it is often checked
+    loginReq.setRawHeader("Referer", "https://www.beatport.com/");
+    // Add Accept headers like beatportdl does
+    loginReq.setRawHeader("Accept", "application/json");
 
     QJsonObject loginBody;
     loginBody["username"] = username;
     loginBody["password"] = password;
 
-    QNetworkReply* loginReply = m_pNam->post(loginReq, QJsonDocument(loginBody).toJson());
+    QByteArray bodyData = QJsonDocument(loginBody).toJson(QJsonDocument::Compact);
+    qDebug() << "BeatportService: POST" << loginUrl.toString() << "body:" << bodyData;
+
+    QNetworkReply* loginReply = m_pNam->post(loginReq, bodyData);
     connect(loginReply, &QNetworkReply::finished, this, [this, loginReply]() {
         loginReply->deleteLater();
 
         if (loginReply->error() != QNetworkReply::NoError) {
-            emit loginError(QString("Login failed: %1").arg(loginReply->errorString()));
+            QString errorBody = QString::fromUtf8(loginReply->readAll());
+            emit loginError(QString("Login failed: %1. Body: %2").arg(loginReply->errorString(), errorBody));
             return;
         }
 
@@ -471,11 +482,10 @@ void BeatportService::exchangeCodeForToken(const QString& code) {
     params.addQueryItem("grant_type", "authorization_code");
     params.addQueryItem("code", code);
     params.addQueryItem("client_id", kClientId);
-    // Redirect URI must match what was implied or configured.
-    // If we used the browser flow stub, it used localhost:8889.
-    // The previous manual flow assumed specific redirect URI?
-    // beatportdl uses "http://localhost:8889/callback"
-    params.addQueryItem("redirect_uri", "http://localhost:8889/callback");
+    // NOTE: Do NOT send redirect_uri here.
+    // Beatport's OAuth doesn't use redirect_uri in the token exchange.
+    // The Go reference (beatportdl/auth.go:161-175) confirms this.
+    // Sending it causes "Mismatching redirect URI" error.
 
     QNetworkReply* reply = m_pNam->post(req, params.toString(QUrl::FullyEncoded).toUtf8());
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {

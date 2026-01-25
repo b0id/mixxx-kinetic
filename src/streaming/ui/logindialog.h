@@ -2,6 +2,7 @@
 
 #include <QDialog>
 #include <QLabel>
+#include <QLineEdit>
 #include <QPushButton>
 #include <QStackedWidget>
 
@@ -17,6 +18,7 @@ class LoginDialog : public QDialog {
 
   private slots:
     void onStartClicked();
+    void onCredentialsSubmit();
     void onCancelClicked();
 
     // Connected to StreamingService/OAuth signals via Service
@@ -29,13 +31,20 @@ class LoginDialog : public QDialog {
   private:
     void setupUi();
     void showPage(int index);
+    bool requiresCredentialAuth() const;
 
     StreamingService* m_service;
 
     QStackedWidget* m_stack;
 
-    // Page 0: Start
+    // Page 0: Start (for browser/device flow)
     QWidget* m_pageStart;
+
+    // Page 0b: Credentials (for Beatport session cookie flow)
+    QWidget* m_pageCredentials;
+    QLineEdit* m_editUsername;
+    QLineEdit* m_editPassword;
+    QPushButton* m_btnSubmitCredentials;
 
     // Page 1: Waiting for User (Device Code)
     QWidget* m_pageCode;

@@ -411,7 +411,7 @@ QFuture<OAuthManager::TokenPair> OAuthManager::initiateBrowserFlow(const QString
     startLocalServer();
 
     const auto& config = m_services[serviceId];
-    QString redirectUri = "http://localhost:8889/callback";
+    QString redirectUri = "http://localhost:8889";
 
     QUrl authUrl(config.authUrl);
     QUrlQuery params;
@@ -494,7 +494,7 @@ void OAuthManager::handleNewConnection() {
             QUrlQuery params;
             params.addQueryItem("grant_type", "authorization_code");
             params.addQueryItem("code", code);
-            params.addQueryItem("redirect_uri", "http://localhost:8889/callback");
+            params.addQueryItem("redirect_uri", "http://localhost:8889");
             params.addQueryItem("client_id", config.clientId);
             params.addQueryItem("code_verifier", m_currentPkceVerifier);
             // params.addQueryItem("client_secret", config.clientSecret); // Not needed for PKCE usually, but maybe?
